@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="nav-styles.css">
+    <link rel="stylesheet" href="dashboard-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+
+    <nav class="main-nav">
+        <div class="nav-brand">💰 WageTracker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link active">Dashboard</a>
+            <a href="budget.html" class="nav-link">Budget</a>
+            <a href="shifts.html" class="nav-link">Shifts</a>
+            <a href="userinfo.html" class="nav-link">My Jobs</a>
+            <a href="myprofile.html" class="nav-link">Profile</a>
+            <button id="nav-logout-btn" class="nav-logout">Log Out</button>
+        </div>
+    </nav>
+
+    <header>
+        <div class="header-left">
+            <h1 id="user-name">Loading...</h1>
+            <p id="job-title-display">—</p>
+        </div>
+        <div class="header-right">
+            <label for="view-date">Viewing:</label>
+            <input type="date" id="view-date">
+        </div>
+    </header>
+
+    <main>
+
+        <section class="job-select-section" id="job-select-section" style="display:none;">
+            <label for="active-job">Clocking in as:</label>
+            <select id="active-job"></select>
+        </section>
+
+        <section class="clock-section">
+            <button id="clock-in">Clock In</button>
+            <button id="clock-out" disabled>Clock Out</button>
+            <button id="start-lunch-btn" disabled>Start Lunch</button>
+            <button id="end-lunch-btn" disabled style="display:none;">End Lunch</button>
+            <p id="clock-status">Not clocked in</p>
+            <p id="lunch-status"></p>
+        </section>
+
+        <section class="constantpay">
+            <h2>Today's Earnings <button class="tax-toggle" data-target="constantpay">Show After Tax</button></h2>
+            <p class="big-number" id="live-pay">$0.00</p>
+        </section>
+
+        <section class="commission-section">
+            <h2>Commission</h2>
+            <input type="number" id="commission-input" step="0.01" min="0" placeholder="Commission amount ($)">
+            <button id="add-commission-btn">Add Commission</button>
+            <p id="commission-status"></p>
+        </section>
+
+        <section class="pay-section">
+            <h2>Totals <button class="tax-toggle" data-target="pay-section">Show After Tax</button></h2>
+            <div class="pay-grid">
+                <div class="pay-box">
+                    <span class="label">Day</span>
+                    <span class="value" id="total-day">$0.00</span>
+                </div>
+                <div class="pay-box">
+                    <span class="label">Week</span>
+                    <span class="value" id="total-week">$0.00</span>
+                </div>
+                <div class="pay-box">
+                    <span class="label">Month</span>
+                    <span class="value" id="total-month">$0.00</span>
+                </div>
+                <div class="pay-box">
+                    <span class="label">Year</span>
+                    <span class="value" id="total-year">$0.00</span>
+                </div>
+            </div>
+            <div class="tax-rate-setting">
+                <label for="tax-rate">Estimated tax rate:</label>
+                <input type="number" id="tax-rate" min="0" max="100" value="20">%
+            </div>
+        </section>
+
+        <section class="income-monthly-graph">
+            <h2>Monthly Income <button class="tax-toggle" data-target="income-monthly-graph">Show After Tax</button></h2>
+            <canvas id="monthly-chart" height="220"></canvas>
+            <p class="disclaimer">Wage earnings and commission are shown separately so you can compare month to month.</p>
+        </section>
+
+        <section class="pay-comparison-section">
+            <h2>How You Compare</h2>
+            <div id="comparison-list"></div>
+            <p class="disclaimer">Comparison uses a reference table of typical wages and is for illustration only — not official wage data.</p>
+        </section>
+
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

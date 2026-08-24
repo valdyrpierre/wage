@@ -1,0 +1,203 @@
+/* myprofile-styles.css - My Profile Page */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #eef2f5;
+    min-height: 100vh;
+}
+
+header {
+    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
+    background-size: 300% 300%;
+    animation: gradientShift 12s ease infinite;
+    color: #fff;
+    padding: 26px 40px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+header h1 {
+    font-size: 1.7rem;
+    font-weight: 800;
+}
+
+main {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 34px 20px 60px;
+    display: grid;
+    gap: 22px;
+}
+
+section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+h2 {
+    font-size: 1.2rem;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+.profile-info p {
+    font-size: 1rem;
+    color: #334155;
+    margin-bottom: 10px;
+}
+
+/* ---------- FORMS ---------- */
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+form label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+    margin-top: 14px;
+}
+
+form label:first-of-type {
+    margin-top: 0;
+}
+
+form input[type="text"],
+form input[type="email"],
+form input[type="password"],
+form input[type="number"],
+form select {
+    padding: 10px 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+form input:focus,
+form select:focus {
+    border-color: #0f766e;
+    outline: none;
+}
+
+form input[type="submit"] {
+    margin-top: 18px;
+    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+form input[type="submit"]:hover {
+    opacity: 0.92;
+}
+
+#update-status,
+#job-edit-status {
+    font-size: 0.85rem;
+    margin-top: 10px;
+}
+
+/* ---------- EDIT JOBS ---------- */
+
+.edit-jobs #job-select {
+    margin-bottom: 16px;
+}
+
+.job-edit-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.job-edit-buttons input[type="submit"] {
+    flex: 1;
+    margin-top: 0;
+}
+
+#delete-job-btn {
+    background: transparent;
+    border: 2px solid #dc2626;
+    color: #dc2626;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+#delete-job-btn:hover {
+    background: #dc2626;
+    color: #fff;
+}
+
+/* ---------- ACCOUNT / DANGER ZONE ---------- */
+
+.danger-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#logout-btn {
+    background: #0f766e;
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#logout-btn:hover {
+    background: #0d5f58;
+}
+
+.danger-btn {
+    background: transparent;
+    border: 2px solid #dc2626;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.danger-btn:hover {
+    background: #dc2626;
+    color: #fff;
+}
+
+.hint {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.danger-zone .hint {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    text-align: center;
+}

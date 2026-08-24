@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shift History</title>
+    <link rel="stylesheet" href="nav-styles.css">
+    <link rel="stylesheet" href="shifts-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <nav class="main-nav">
+        <div class="nav-brand">💰 WageTracker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="budget.html" class="nav-link">Budget</a>
+            <a href="shifts.html" class="nav-link active">Shifts</a>
+            <a href="userinfo.html" class="nav-link">My Jobs</a>
+            <a href="myprofile.html" class="nav-link">Profile</a>
+            <button id="nav-logout-btn" class="nav-logout">Log Out</button>
+        </div>
+    </nav>
+
+    <main>
+        <header>
+            <h1>Shift History</h1>
+            <p class="subtext">Grouped by two-week pay period. Fix a forgotten clock-in/out, or log a shift you missed entirely.</p>
+        </header>
+
+        <section class="add-shift-section">
+            <h2>Add a Shift</h2>
+            <form id="add-shift-form">
+                <label for="add-shift-job">Job:</label>
+                <select id="add-shift-job" required></select>
+
+                <div class="datetime-row">
+                    <div>
+                        <label for="add-shift-clockin">Clocked In:</label>
+                        <input type="datetime-local" id="add-shift-clockin" required>
+                    </div>
+                    <div>
+                        <label for="add-shift-clockout">Clocked Out:</label>
+                        <input type="datetime-local" id="add-shift-clockout" required>
+                    </div>
+                </div>
+
+                <p id="add-shift-status" class="form-status"></p>
+                <input type="submit" value="Add Shift">
+            </form>
+        </section>
+
+        <section class="shift-periods-section">
+            <h2>Pay Periods</h2>
+            <div id="periods-list">Loading...</div>
+        </section>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="shifts.js"></script>
+</body>
+
+</html>

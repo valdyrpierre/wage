@@ -1,0 +1,288 @@
+/* budget-styles.css - Budget Page */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #eef2f5;
+    min-height: 100vh;
+}
+
+main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+    display: grid;
+    gap: 22px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+header h1 {
+    color: #0f766e;
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.subtext {
+    color: #64748b;
+    font-size: 0.95rem;
+    margin-top: 6px;
+}
+
+section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+h2 {
+    font-size: 1.2rem;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+/* ---------- SUMMARY ---------- */
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.summary-box {
+    background: #f8fafc;
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+
+.summary-box .label {
+    display: block;
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.summary-box .value {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.progress-bar-track {
+    background: #e2e8f0;
+    border-radius: 20px;
+    height: 14px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #14b8a6, #0f766e);
+    border-radius: 20px;
+    transition: width 0.5s ease;
+}
+
+.progress-bar-fill.over {
+    background: linear-gradient(90deg, #f87171, #dc2626);
+}
+
+/* ---------- INCOME ---------- */
+
+#income-list {
+    color: #334155;
+    font-size: 1rem;
+}
+
+/* ---------- ADD BILL FORM ---------- */
+
+#add-bill-form {
+    display: flex;
+    flex-direction: column;
+}
+
+#add-bill-form label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+    margin-top: 14px;
+}
+
+#add-bill-form label:first-of-type {
+    margin-top: 0;
+}
+
+#add-bill-form input[type="text"],
+#add-bill-form input[type="number"],
+#add-bill-form input[type="date"],
+#add-bill-form select {
+    padding: 10px 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+#add-bill-form input:focus,
+#add-bill-form select:focus {
+    border-color: #0f766e;
+    outline: none;
+}
+
+.hint {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 6px;
+}
+
+#add-bill-form input[type="submit"] {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#add-bill-form input[type="submit"]:hover {
+    opacity: 0.92;
+}
+
+/* ---------- BILL SCHEDULE ROWS ---------- */
+
+.bill-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.2fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border-left: 4px solid #94a3b8;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.bill-row.due-soon {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.bill-row.overdue {
+    border-left-color: #dc2626;
+    background: #fef2f2;
+}
+
+.bill-row.paid {
+    border-left-color: #16a34a;
+    background: #f0fdf4;
+    opacity: 0.75;
+}
+
+.delete-bill-btn {
+    background: transparent;
+    border: 1px solid #dc2626;
+    color: #dc2626;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.delete-bill-btn:hover {
+    background: #dc2626;
+    color: #fff;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #334155;
+    margin-top: 16px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #0f766e;
+    cursor: pointer;
+}
+
+#recurring-months-wrap {
+    margin-top: 10px;
+    padding: 14px;
+    background: #f0fdfa;
+    border: 1px solid #ccfbf1;
+    border-radius: 10px;
+}
+
+#recurring-months-wrap label {
+    margin-top: 0 !important;
+}
+
+#recurring-months-wrap input[type="number"] {
+    width: 100px;
+}
+
+.bill-name {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.bill-status {
+    text-align: right;
+    font-weight: 600;
+    color: #475569;
+}
+
+/* ---------- CHECKLIST ---------- */
+
+.checklist-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #334155;
+}
+
+.checklist-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #0f766e;
+    cursor: pointer;
+}
+
+footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    padding: 10px 0 0;
+}

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account</title>
+    <link rel="stylesheet" href="create-account-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1>Create Account Page</h1>
+        </header>
+
+        <form id="signup-form">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <p id="error-msg" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
+            <p id="success-msg" style="color: #0f766e; font-size: 0.85rem; margin-top: 10px;"></p>
+
+            <input type="submit" value="Create Account">
+            <input type="button" value="Back to Login" onclick="window.location.href='login.html'">
+        </form>
+
+        <footer>
+            <p>this is a project i did for education purposes feel free to use it</p>
+        </footer>
+    </main>
+
+    <script>
+        // TODO: replace with your actual Supabase project values
+        // Found in Supabase dashboard: Project Settings > API
+        const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const form = document.getElementById('signup-form');
+        const errorMsg = document.getElementById('error-msg');
+        const successMsg = document.getElementById('success-msg');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            // ---- validation before ever contacting Supabase ----
+
+            // simple email format check (not exhaustive, but catches obvious typos
+            // like missing "@" or "." — the type="email" input already helps too)
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(email)) {
+                errorMsg.textContent = 'Please enter a valid email address.';
+                return;
+            }
+
+            // Supabase's default password policy requires at least 6 characters —
+            // checking here gives an instant, friendlier error instead of waiting
+            // on a round-trip to the server to find out
+            if (password.length < 6) {
+                errorMsg.textContent = 'Password must be at least 6 characters long.';
+                return;
+            }
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (error) {
+                errorMsg.textContent = error.message;
+                return;
+            }
+
+            // Account created successfully.
+            // NOTE: this redirect only works immediately if "Confirm email"
+            // is turned OFF in Supabase (Authentication > Sign In / Providers > Email).
+            // If confirmation is required, there is no active session yet,
+            // and the user must confirm via email before being logged in.
+            successMsg.textContent = 'Account created! Redirecting...';
+            window.location.href = 'userinfo.html';
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget</title>
+    <link rel="stylesheet" href="nav-styles.css">
+    <link rel="stylesheet" href="budget-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <nav class="main-nav">
+        <div class="nav-brand">💰 WageTracker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="budget.html" class="nav-link active">Budget</a>
+            <a href="shifts.html" class="nav-link">Shifts</a>
+            <a href="userinfo.html" class="nav-link">My Jobs</a>
+            <a href="myprofile.html" class="nav-link">Profile</a>
+            <button id="nav-logout-btn" class="nav-logout">Log Out</button>
+        </div>
+    </nav>
+
+    <main>
+        <header>
+            <h1>Budget</h1>
+            <p class="subtext">Track your bills against what you've earned this month.</p>
+        </header>
+
+        <section class="budget-summary">
+            <h2>Budget Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-box">
+                    <span class="label">Earned This Month</span>
+                    <span class="value" id="summary-income">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">Total Bills This Month</span>
+                    <span class="value" id="summary-bills">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">% of Bills Covered</span>
+                    <span class="value" id="summary-percent">0%</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">Left to Spend</span>
+                    <span class="value" id="summary-left">$0.00</span>
+                </div>
+            </div>
+            <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="summary-progress-fill"></div>
+            </div>
+        </section>
+
+        <section class="income-section">
+            <h2>My Income</h2>
+            <p id="income-list">Loading...</p>
+        </section>
+
+        <section class="budget-section">
+            <h2>Add a Bill</h2>
+            <form id="add-bill-form">
+                <label for="bill-name">Bill Name:</label>
+                <input type="text" id="bill-name" required placeholder="e.g. Electric Bill">
+
+                <label for="bill-amount">Amount ($):</label>
+                <input type="number" id="bill-amount" step="0.01" min="0.01" max="1000000" required>
+
+                <label for="bill-due-date">Due Date:</label>
+                <input type="date" id="bill-due-date" required>
+
+                <label for="bill-split">Split into:</label>
+                <select id="bill-split">
+                    <option value="1">Don't split</option>
+                    <option value="2">2 payments</option>
+                    <option value="3">3 payments</option>
+                    <option value="4">4 payments</option>
+                </select>
+                <p class="hint">Splitting spaces payments 2 weeks apart, starting on the due date above.</p>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" id="bill-recurring">
+                    Repeat this bill monthly
+                </label>
+
+                <div id="recurring-months-wrap" style="display:none;">
+                    <label for="bill-recurring-months">Generate for how many months:</label>
+                    <input type="number" id="bill-recurring-months" min="1" max="24" value="12">
+                    <p class="hint">Creates this bill on the same day each month, starting from the due date above. (Can't be combined with splitting.)</p>
+                </div>
+
+                <p id="bill-form-status" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
+
+                <input type="submit" value="Add Bill">
+            </form>
+        </section>
+
+        <section class="bill-schedules">
+            <h2>Bill Schedules</h2>
+            <div id="bill-schedules-list">Loading...</div>
+        </section>
+
+        <section class="bill-checklist">
+            <h2>Bill Checklist</h2>
+            <div id="bill-checklist-list">Loading...</div>
+        </section>
+
+        <footer>
+            <p>This is a project I did for educational purposes. Feel free to use it.</p>
+        </footer>
+    </main>
+
+    <script src="shared.js"></script>
+    <script src="budget.js"></script>
+</body>
+
+</html>

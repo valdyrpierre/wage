@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Info</title>
+    <link rel="stylesheet" href="nav-styles.css">
+    <link rel="stylesheet" href="userinfo-styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <nav class="main-nav">
+        <div class="nav-brand">💰 WageTracker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="budget.html" class="nav-link">Budget</a>
+            <a href="shifts.html" class="nav-link">Shifts</a>
+            <a href="userinfo.html" class="nav-link active">My Jobs</a>
+            <a href="myprofile.html" class="nav-link">Profile</a>
+            <button id="nav-logout-btn" class="nav-logout">Log Out</button>
+        </div>
+    </nav>
+
+    <main>
+        <header>
+            <h1>User Info</h1>
+            <p class="subtext">Tell us about your job(s) and hourly wage. Hours will be tracked separately via clock in/out.</p>
+        </header>
+
+        <form id="userinfo-form">
+            <div id="jobs-container">
+                <!-- job entry template (first job) -->
+                <div class="job-entry">
+                    <label for="job_title_0">Job Title:</label>
+                    <div class="autocomplete-wrapper">
+                        <input type="text" class="job_title" id="job_title_0" name="job_title_0" autocomplete="off" placeholder="Start typing e.g. Cashier..." required>
+                        <div class="autocomplete-list" id="autocomplete_list_0"></div>
+                    </div>
+
+                    <label for="hourly_wage_0">Hourly Wage ($):</label>
+                    <input type="number" class="hourly_wage" id="hourly_wage_0" name="hourly_wage_0" step="0.01" min="0.01" max="1000" required>
+                </div>
+            </div>
+
+            <button type="button" id="add_job_additional_button">+ Additional Job</button>
+
+            <p id="error-msg" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
+            <p id="success-msg" style="color: #0f766e; font-size: 0.85rem; margin-top: 10px;"></p>
+
+            <input type="submit" value="Save & Continue">
+        </form>
+    </main>
+
+    <script>
+        // TODO: replace with your actual Supabase project values
+        const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ---------- NAV LOGOUT ----------
+        document.getElementById('nav-logout-btn').addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        // Predefined list of common job titles for the autocomplete search box.
+        // Feel free to add/remove titles here — this is just a starting list.
+        const JOB_TITLES = [
+            "Cashier", "Retail Sales Associate", "Server", "Bartender", "Barista",
+            "Line Cook", "Prep Cook", "Dishwasher", "Host/Hostess", "Food Runner",
+            "Delivery Driver", "Truck Driver", "Warehouse Associate", "Forklift Operator",
+            "Stocker", "Customer Service Representative", "Call Center Representative",
+            "Receptionist", "Administrative Assistant", "Office Manager", "Data Entry Clerk",
+            "Bank Teller", "Security Guard", "Janitor", "Housekeeper", "Landscaper",
+            "Construction Laborer", "Electrician", "Plumber", "HVAC Technician",
+            "Carpenter", "Painter", "Auto Mechanic", "Auto Detailer",
+            "Nursing Assistant (CNA)", "Home Health Aide", "Medical Assistant",
+            "Pharmacy Technician", "Dental Assistant", "Veterinary Assistant",
+            "Registered Nurse", "EMT/Paramedic", "Teacher's Aide", "Substitute Teacher",
+            "Tutor", "Childcare Worker", "Camp Counselor", "Lifeguard",
+            "Personal Trainer", "Fitness Instructor", "Hair Stylist", "Barber",
+            "Nail Technician", "Massage Therapist", "Retail Manager", "Assistant Manager",
+            "Shift Supervisor", "Team Lead", "Marketing Assistant", "Social Media Manager",
+            "Graphic Designer", "Photographer", "Videographer", "Web Developer",
+            "Software Engineer", "IT Support Specialist", "Help Desk Technician",
+            "Accountant", "Bookkeeper", "Payroll Clerk", "HR Assistant", "Recruiter",
+            "Sales Representative", "Real Estate Agent", "Insurance Agent",
+            "Loan Officer", "Paralegal", "Legal Assistant", "Bank Manager",
+            "Grocery Clerk", "Butcher", "Baker", "Barback", "Valet",
+            "Housekeeping Supervisor", "Hotel Front Desk Agent", "Concierge",
+            "Event Coordinator", "Flight Attendant", "Delivery/Courier",
+            "Warehouse Supervisor", "Machine Operator", "Assembly Line Worker",
+            "Quality Control Inspector", "Welder", "Painter (Industrial)",
+            "Freelancer/Self-Employed", "Other"
+        ];
+
+        let jobCount = 1; // job_0 already exists in the HTML
+
+        // sets up autocomplete behavior for a given job title input + its dropdown
+        function setupAutocomplete(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+
+            input.addEventListener('input', () => {
+                const query = input.value.trim().toLowerCase();
+                list.innerHTML = '';
+
+                if (query.length === 0) {
+                    list.style.display = 'none';
+                    return;
+                }
+
+                const matches = JOB_TITLES.filter(title =>
+                    title.toLowerCase().includes(query)
+                ).slice(0, 8); // cap to 8 suggestions
+
+                if (matches.length === 0) {
+                    list.style.display = 'none';
+                    return;
+                }
+
+                matches.forEach(title => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item';
+                    item.textContent = title;
+                    item.addEventListener('click', () => {
+                        input.value = title;
+                        list.innerHTML = '';
+                        list.style.display = 'none';
+                    });
+                    list.appendChild(item);
+                });
+
+                list.style.display = 'block';
+            });
+
+            // hide dropdown if user clicks elsewhere
+            document.addEventListener('click', (e) => {
+                if (e.target !== input) {
+                    list.style.display = 'none';
+                }
+            });
+        }
+
+        // set up autocomplete for the first job entry that's already on the page
+        setupAutocomplete('job_title_0', 'autocomplete_list_0');
+
+        // add a new job title/wage pair when the button is clicked
+        document.getElementById('add_job_additional_button').addEventListener('click', () => {
+            const container = document.getElementById('jobs-container');
+
+            const jobDiv = document.createElement('div');
+            jobDiv.className = 'job-entry';
+            jobDiv.innerHTML = `
+                <label for="job_title_${jobCount}">Job Title:</label>
+                <div class="autocomplete-wrapper">
+                    <input type="text" class="job_title" id="job_title_${jobCount}" name="job_title_${jobCount}" autocomplete="off" placeholder="Start typing e.g. Cashier..." required>
+                    <div class="autocomplete-list" id="autocomplete_list_${jobCount}"></div>
+                </div>
+
+                <label for="hourly_wage_${jobCount}">Hourly Wage ($):</label>
+                <input type="number" class="hourly_wage" id="hourly_wage_${jobCount}" name="hourly_wage_${jobCount}" step="0.01" min="0.01" max="1000" required>
+            `;
+
+            container.appendChild(jobDiv);
+            setupAutocomplete(`job_title_${jobCount}`, `autocomplete_list_${jobCount}`);
+            jobCount++;
+        });
+
+        // on submit, gather every job entry and save them to Supabase
+        const form = document.getElementById('userinfo-form');
+        const errorMsg = document.getElementById('error-msg');
+        const successMsg = document.getElementById('success-msg');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+
+            // confirm the user is logged in before saving anything
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+            if (userError || !user) {
+                errorMsg.textContent = 'You must be logged in to save your info.';
+                return;
+            }
+
+            // collect all job title / wage pairs currently on the page
+            const jobTitles = document.querySelectorAll('.job_title');
+            const jobWages = document.querySelectorAll('.hourly_wage');
+
+            // ---- validate every job entry before inserting anything ----
+            // A reasonable upper bound on wage catches obvious typos (e.g. an
+            // extra zero) without being unrealistically restrictive for anyone
+            // with a genuinely high hourly rate.
+            const MAX_REASONABLE_WAGE = 1000;
+
+            for (let i = 0; i < jobTitles.length; i++) {
+                const title = jobTitles[i].value.trim();
+                const wage = parseFloat(jobWages[i].value);
+                const entryNumber = i + 1;
+
+                if (!title) {
+                    errorMsg.textContent = `Job #${entryNumber}: please enter a job title.`;
+                    return;
+                }
+
+                if (isNaN(wage) || wage <= 0) {
+                    errorMsg.textContent = `Job #${entryNumber} (${title}): hourly wage must be a number greater than 0.`;
+                    return;
+                }
+
+                if (wage > MAX_REASONABLE_WAGE) {
+                    errorMsg.textContent = `Job #${entryNumber} (${title}): $${wage}/hr seems too high — please double-check it.`;
+                    return;
+                }
+            }
+
+            const jobsToInsert = [];
+            for (let i = 0; i < jobTitles.length; i++) {
+                jobsToInsert.push({
+                    user_id: user.id,
+                    job_title: jobTitles[i].value.trim(),
+                    hourly_wage: parseFloat(jobWages[i].value)
+                });
+            }
+
+            const { error } = await supabaseClient
+                .from('jobs')
+                .insert(jobsToInsert);
+
+            if (error) {
+                errorMsg.textContent = error.message;
+                return;
+            }
+
+            successMsg.textContent = 'Saved! Redirecting...';
+            window.location.href = 'dashboard.html';
+        });
+    </script>
+</body>
+
+</html>

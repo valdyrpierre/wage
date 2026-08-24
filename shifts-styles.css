@@ -1,0 +1,274 @@
+/* shifts-styles.css - Shift History Page */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #eef2f5;
+    min-height: 100vh;
+}
+
+main {
+    max-width: 950px;
+    margin: 0 auto;
+    padding: 34px 20px 60px;
+    display: grid;
+    gap: 22px;
+}
+
+header {
+    text-align: center;
+}
+
+header h1 {
+    color: #0f766e;
+    font-size: 2rem;
+    font-weight: 800;
+}
+
+.subtext {
+    color: #64748b;
+    font-size: 0.95rem;
+    margin-top: 6px;
+}
+
+section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+h2 {
+    font-size: 1.2rem;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+/* ---------- ADD SHIFT FORM ---------- */
+
+#add-shift-form {
+    display: flex;
+    flex-direction: column;
+}
+
+#add-shift-form label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+    margin-top: 14px;
+    display: block;
+}
+
+#add-shift-form select,
+#add-shift-form input[type="datetime-local"] {
+    padding: 10px 12px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    width: 100%;
+}
+
+#add-shift-form select:focus,
+#add-shift-form input:focus {
+    border-color: #0f766e;
+    outline: none;
+}
+
+.datetime-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-status {
+    font-size: 0.85rem;
+    color: #dc2626;
+    margin-top: 10px;
+}
+
+#add-shift-form input[type="submit"] {
+    margin-top: 20px;
+    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    color: #fff;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#add-shift-form input[type="submit"]:hover {
+    opacity: 0.92;
+}
+
+/* ---------- ANCHOR HINT ---------- */
+
+.anchor-hint {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+}
+
+.anchor-hint a {
+    color: #0f766e;
+    font-weight: 700;
+}
+
+/* ---------- PAY PERIODS ---------- */
+
+.pay-period {
+    margin-bottom: 24px;
+}
+
+.pay-period:last-child {
+    margin-bottom: 0;
+}
+
+.pay-period-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #0f172a;
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 10px 10px 0 0;
+    font-weight: 700;
+}
+
+.period-range {
+    font-size: 0.95rem;
+}
+
+.period-total {
+    font-size: 1.1rem;
+    color: #5eead4;
+}
+
+/* ---------- SHIFT ROWS ---------- */
+
+.shift-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1.6fr 1.6fr 0.9fr 0.9fr 1.3fr;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-left: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.85rem;
+}
+
+.pay-period .shift-row:last-child {
+    border-radius: 0 0 10px 10px;
+}
+
+.shift-row.active-shift {
+    background: #fffbeb;
+    border-left: 3px solid #f59e0b;
+}
+
+.shift-job {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.shift-pay {
+    font-weight: 700;
+    color: #0f766e;
+    text-align: right;
+}
+
+.shift-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.edit-shift-btn,
+.save-shift-btn {
+    background: #0f766e;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.edit-shift-btn:hover,
+.save-shift-btn:hover {
+    background: #0d5f58;
+}
+
+.delete-shift-btn,
+.cancel-shift-btn {
+    background: transparent;
+    border: 1px solid #dc2626;
+    color: #dc2626;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.delete-shift-btn:hover,
+.cancel-shift-btn:hover {
+    background: #dc2626;
+    color: #fff;
+}
+
+.cancel-shift-btn {
+    border-color: #94a3b8;
+    color: #64748b;
+}
+
+.cancel-shift-btn:hover {
+    background: #94a3b8;
+    color: #fff;
+}
+
+/* ---------- SHIFT EDIT MODE ---------- */
+
+.shift-edit-fields {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    grid-column: span 4;
+}
+
+.shift-edit-fields label {
+    font-size: 0.8rem;
+    color: #334155;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.shift-edit-fields input[type="datetime-local"] {
+    padding: 8px 10px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.shift-edit-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.shift-row .edit-shift-status {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+}
