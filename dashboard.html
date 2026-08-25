@@ -31,6 +31,7 @@
         <div class="header-right">
             <label for="view-date">Viewing:</label>
             <input type="date" id="view-date">
+            <button id="view-date-btn" type="button">View</button>
         </div>
     </header>
 
@@ -51,8 +52,9 @@
         </section>
 
         <section class="constantpay">
-            <h2>Today's Earnings <button class="tax-toggle" data-target="constantpay">Show After Tax</button></h2>
+            <h2><span id="earnings-label">Today's Earnings</span> <button class="tax-toggle" data-target="constantpay">Show After Tax</button></h2>
             <p class="big-number" id="live-pay">$0.00</p>
+            <p class="day-breakdown" id="day-breakdown"></p>
         </section>
 
         <section class="commission-section">
@@ -99,7 +101,7 @@
             <div id="comparison-list"></div>
             <p class="disclaimer">Comparison uses a reference table of typical wages and is for illustration only — not official wage data.</p>
         </section>
-
+a
     </main>
 
     <script src="shared.js"></script>
