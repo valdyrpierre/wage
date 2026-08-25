@@ -24,6 +24,16 @@
             return d.toISOString().split('T')[0];
         }
 
+        // Parses a "YYYY-MM-DD" string (like the value from a date input) as
+        // LOCAL midnight instead of UTC midnight. Using `new Date("2026-08-20")`
+        // directly parses it as UTC, which in US timezones actually lands on
+        // the evening of Aug 19 local time — causing the "day" picker to
+        // silently roll back one day. This avoids that.
+        function parseLocalDate(dateStr) {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        }
+
         function getTaxRate() {
             const raw = parseFloat(document.getElementById('tax-rate').value) || 0;
             // clamp to a sane 0-100% range so a stray typo (like "150" or a
@@ -499,7 +509,7 @@
         }
 
         async function refreshTotals() {
-            const refDate = new Date(document.getElementById('view-date').value || todayStr());
+            const refDate = parseLocalDate(document.getElementById('view-date').value || todayStr());
             const now = new Date(refDate);
             now.setDate(now.getDate() + 1); // end-exclusive for "day"
 
