@@ -67,6 +67,28 @@ header h1 {
     outline: 2px solid #fff;
 }
 
+#view-date-btn {
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: #fff;
+    color: #0f766e;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#view-date-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+#view-date-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 /* ---------- LAYOUT + ENTRANCE ANIMATION ---------- */
 
 main {
@@ -264,6 +286,26 @@ button:disabled {
     0% { transform: scale(1); text-shadow: 0 0 0 rgba(15, 118, 110, 0); }
     40% { transform: scale(1.05); text-shadow: 0 0 14px rgba(15, 118, 110, 0.35); }
     100% { transform: scale(1); text-shadow: 0 0 0 rgba(15, 118, 110, 0); }
+}
+
+.day-breakdown {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.day-breakdown.breakdown-primary {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-top: 20px;
+}
+
+.day-breakdown.breakdown-primary span {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f766e;
 }
 
 .tax-toggle {
