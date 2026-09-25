@@ -49,6 +49,11 @@
             <button id="end-lunch-btn" disabled style="display:none;">End Lunch</button>
             <p id="clock-status">Not clocked in</p>
             <p id="lunch-status"></p>
+
+            <div id="lunch-breaks-section">
+                <h3>Today's Lunch Breaks</h3>
+                <div id="lunch-breaks-list">No breaks logged today.</div>
+            </div>
         </section>
 
         <section class="constantpay">
@@ -59,9 +64,23 @@
 
         <section class="commission-section">
             <h2>Commission</h2>
-            <input type="number" id="commission-input" step="0.01" min="0" placeholder="Commission amount ($)">
-            <button id="add-commission-btn">Add Commission</button>
+            <div class="commission-form-row">
+                <div>
+                    <label for="commission-date">Date:</label>
+                    <input type="date" id="commission-date">
+                </div>
+                <div>
+                    <label for="commission-input">Amount ($):</label>
+                    <input type="number" id="commission-input" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <button id="add-commission-btn">Add Commission</button>
+            </div>
             <p id="commission-status"></p>
+
+            <div id="commission-entries-section">
+                <h3>Entries for this date</h3>
+                <div id="commission-entries-list">No commission logged for this date.</div>
+            </div>
         </section>
 
         <section class="pay-section">
@@ -101,7 +120,170 @@
             <div id="comparison-list"></div>
             <p class="disclaimer">Comparison uses a reference table of typical wages and is for illustration only — not official wage data.</p>
         </section>
-a
+
+        <!-- ============================================================
+             WORK + COMMISSION TRACKER
+             (added to match valdyrpierre.github.io/budget/homepage.html)
+             ============================================================ -->
+
+        <section class="weekly-snapshot-section">
+            <h2>Quick Weekly Snapshot</h2>
+            <p class="section-subtext">Track daily earnings, reviews, and month totals.</p>
+            <div class="snapshot-box">
+                <span class="label">This Week Earnings</span>
+                <span class="value" id="snapshot-week-earnings">$0.00</span>
+            </div>
+        </section>
+
+        <section class="daily-entry-section">
+            <h2>Daily Entry</h2>
+            <form id="daily-entry-form">
+                <label for="entry-date">Date:</label>
+                <input type="date" id="entry-date" required>
+
+                <label for="entry-hours">Hours Worked:</label>
+                <input type="number" id="entry-hours" step="0.25" min="0" max="24" placeholder="0">
+
+                <label for="entry-phones">Phones Repaired ($5 each):</label>
+                <input type="number" id="entry-phones" step="1" min="0" placeholder="0">
+
+                <label for="entry-signups">Insurance Signups ($35 each):</label>
+                <input type="number" id="entry-signups" step="1" min="0" placeholder="0">
+
+                <label for="entry-customers">Total Customers:</label>
+                <input type="number" id="entry-customers" step="1" min="0" placeholder="0">
+
+                <label for="entry-reviews">5-Star Reviews:</label>
+                <input type="number" id="entry-reviews" step="1" min="0" placeholder="0">
+
+                <label for="entry-notes">Daily Notes:</label>
+                <textarea id="entry-notes" rows="2" placeholder="Optional notes about the day"></textarea>
+
+                <div class="daily-entry-buttons">
+                    <input type="submit" value="Save / Update Day">
+                    <button type="button" id="clear-entry-btn">Clear Inputs</button>
+                </div>
+                <p id="daily-entry-status" class="form-status"></p>
+                <p class="hint" id="entry-rate-hint">Hourly pay rate: —</p>
+            </form>
+        </section>
+
+        <section class="daily-summary-section">
+            <h2>Daily Summary</h2>
+            <div class="summary-grid-4">
+                <div class="summary-box">
+                    <span class="label">Hourly Pay</span>
+                    <span class="value" id="summary-hourly-pay">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">Commission Pay</span>
+                    <span class="value" id="summary-commission-pay">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">Total Daily Money</span>
+                    <span class="value" id="summary-total-daily">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">5-Star Rate</span>
+                    <span class="value" id="summary-star-rate">0.00%</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="daily-spending-section">
+            <h2>Daily Spending</h2>
+            <div class="spending-form-row">
+                <div>
+                    <label for="spending-date">Date:</label>
+                    <input type="date" id="spending-date">
+                </div>
+                <div>
+                    <label for="spending-amount">Amount Spent ($):</label>
+                    <input type="number" id="spending-amount" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <button id="save-spending-btn">Save Spending</button>
+            </div>
+            <p id="spending-status" class="form-status"></p>
+            <div class="summary-box" style="margin-top:14px;">
+                <span class="label">Amount for Selected Day</span>
+                <span class="value" id="spending-selected-day">$0.00</span>
+            </div>
+        </section>
+
+        <section class="month-compare-section">
+            <h2>Month Totals (Compare)</h2>
+            <div class="compare-grid">
+                <div class="compare-col">
+                    <h3>This Month</h3>
+                    <div class="summary-box"><span class="label">Money</span><span class="value" id="compare-this-money">$0.00</span></div>
+                    <div class="summary-box"><span class="label">Phones Repaired</span><span class="value" id="compare-this-phones">0</span></div>
+                    <div class="summary-box"><span class="label">5-Star Reviews</span><span class="value" id="compare-this-reviews">0</span></div>
+                    <div class="summary-box"><span class="label">5-Star %</span><span class="value" id="compare-this-rate">0.00%</span></div>
+                </div>
+                <div class="compare-col">
+                    <h3>Last Month</h3>
+                    <div class="summary-box"><span class="label">Money</span><span class="value" id="compare-last-money">$0.00</span></div>
+                    <div class="summary-box"><span class="label">Phones Repaired</span><span class="value" id="compare-last-phones">0</span></div>
+                    <div class="summary-box"><span class="label">5-Star Reviews</span><span class="value" id="compare-last-reviews">0</span></div>
+                    <div class="summary-box"><span class="label">5-Star %</span><span class="value" id="compare-last-rate">0.00%</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="year-totals-section">
+            <h2>Year Totals</h2>
+            <div class="summary-grid-3">
+                <div class="summary-box">
+                    <span class="label">This Year Money</span>
+                    <span class="value" id="year-money">$0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">This Year Hours Worked</span>
+                    <span class="value" id="year-hours">0.00</span>
+                </div>
+                <div class="summary-box">
+                    <span class="label">Average Per Month</span>
+                    <span class="value" id="year-avg-month">$0.00</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="save-goal-section">
+            <h2>Save Goal Planner</h2>
+            <label for="goal-amount">Savings goal after bills ($):</label>
+            <input type="number" id="goal-amount" step="0.01" min="0" placeholder="0.00">
+
+            <h3>Bills for This Month</h3>
+            <div id="goal-bills-list">No bills found for this month.</div>
+
+            <div class="summary-grid-3" style="margin-top:14px;">
+                <div class="summary-box"><span class="label">Total Monthly Bills</span><span class="value" id="goal-total-bills">$0.00</span></div>
+                <div class="summary-box"><span class="label">Bills Paid</span><span class="value" id="goal-bills-paid">$0.00</span></div>
+                <div class="summary-box"><span class="label">Bills Left</span><span class="value" id="goal-bills-left">$0.00</span></div>
+            </div>
+
+            <div class="progress-bar-track" style="margin-top:14px;">
+                <div class="progress-bar-fill" id="goal-progress-fill"></div>
+            </div>
+            <p class="hint" id="goal-progress-label">Goal Progress: 0%</p>
+
+            <div class="summary-grid-3" style="margin-top:14px;">
+                <div class="summary-box"><span class="label">Income This Month</span><span class="value" id="goal-income-month">$0.00</span></div>
+                <div class="summary-box"><span class="label">Needed To Hit Goal</span><span class="value" id="goal-needed">$0.00</span></div>
+                <div class="summary-box"><span class="label">Hours Needed</span><span class="value" id="goal-hours-needed">0.00</span></div>
+            </div>
+            <div class="summary-grid-3" style="margin-top:14px;">
+                <div class="summary-box"><span class="label">Repairs Needed ($5 each)</span><span class="value" id="goal-repairs-needed">0</span></div>
+                <div class="summary-box"><span class="label">Signups Needed ($35 each)</span><span class="value" id="goal-signups-needed">0</span></div>
+            </div>
+        </section>
+
+        <section class="twelve-month-section">
+            <h2>Last 12 Months</h2>
+            <p class="disclaimer">Compares monthly money and 5-star rate for the last 12 months.</p>
+            <canvas id="twelve-month-chart" height="240"></canvas>
+        </section>
+
     </main>
 
     <script src="shared.js"></script>
