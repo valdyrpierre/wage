@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WageTracker — Know exactly what you earn</title>
+    <link rel="stylesheet" href="homepage-styles.css">
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="site-header-inner">
+            <div class="brand">💰 WageTracker</div>
+            <nav class="header-nav">
+                <a href="login.html" class="nav-btn nav-btn-ghost">Log In</a>
+                <a href="create_account.html" class="nav-btn nav-btn-solid">Create Account</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+
+        <section class="hero">
+            <div class="hero-inner">
+                <h1>Know exactly what you're earning — <span>while you're earning it.</span></h1>
+                <p class="hero-subtext">
+                    WageTracker is a free time, pay, and budget tracker built for hourly and commission-based
+                    workers. Clock in and watch your earnings update live, automatically calculated with
+                    overtime, lunch breaks, and commission built in — no spreadsheet, no guessing.
+                </p>
+                <div class="hero-ctas">
+                    <a href="create_account.html" class="cta-primary">Get Started Free</a>
+                    <a href="#demo-section" class="cta-secondary">Try the live demo ↓</a>
+                </div>
+                <p class="hero-note">No credit card. No app to install. Works in your browser.</p>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             LIVE DEMO — an interactive, in-browser preview of the same
+             "minute wage + commission" live counter used on the real
+             dashboard. Nothing here is saved anywhere; it's just a taste
+             of what clocking in actually feels like.
+        ============================================================ -->
+        <section class="demo-section" id="demo-section">
+            <h2>Try it right now — no account needed</h2>
+            <p class="demo-intro">Set a wage, hit Clock In, and watch the counter tick. This is the same live-pay math the real dashboard uses.</p>
+
+            <div class="demo-card">
+                <div class="demo-inputs">
+                    <div class="demo-field">
+                        <label for="demo-wage">Hourly wage</label>
+                        <div class="demo-input-wrap">
+                            <span>$</span>
+                            <input type="number" id="demo-wage" value="19.00" min="1" max="500" step="0.01">
+                        </div>
+                    </div>
+                    <div class="demo-field">
+                        <label for="demo-commission">Commission logged today</label>
+                        <div class="demo-input-wrap">
+                            <span>$</span>
+                            <input type="number" id="demo-commission" value="0" min="0" max="5000" step="1">
+                        </div>
+                    </div>
+                    <button id="demo-add-commission" class="demo-chip-btn" type="button">+ Add $5 commission</button>
+                </div>
+
+                <div class="demo-display">
+                    <p class="demo-label" id="demo-label">Ready to clock in</p>
+                    <p class="demo-big-number" id="demo-big-number">$0.00</p>
+                    <p class="demo-breakdown" id="demo-breakdown">Wages: $0.00 &nbsp;•&nbsp; Commission: $0.00</p>
+                    <div class="demo-overtime-bar-track">
+                        <div class="demo-overtime-bar-fill" id="demo-overtime-fill"></div>
+                    </div>
+                    <p class="demo-overtime-note" id="demo-overtime-note">0.0 hrs this week — overtime kicks in at 40</p>
+                </div>
+
+                <div class="demo-controls">
+                    <button id="demo-clock-in" class="cta-primary demo-btn">Clock In</button>
+                    <button id="demo-clock-out" class="demo-btn demo-btn-stop" disabled>Clock Out</button>
+                    <button id="demo-reset" class="demo-btn demo-btn-ghost">Reset Demo</button>
+                </div>
+                <p class="demo-disclaimer">Demo only — speeds up time so you can see overtime kick in without waiting 40 real hours. Nothing here touches a real account.</p>
+            </div>
+        </section>
+
+        <section class="why-section">
+            <div class="why-grid">
+                <div class="why-copy">
+                    <h2>Why this exists</h2>
+                    <p class="why-text">
+                        Most hourly and commission jobs give you a paycheck every two weeks and little else — you
+                        find out what you earned after the fact, once it's too late to catch a mistake or plan
+                        around it. WageTracker flips that: you see your pay accumulate in real time, know the moment
+                        you hit overtime, and can tell instantly whether a paycheck looks right.
+                    </p>
+                </div>
+                <img class="why-image" src="homepage.jpg" alt="Desk with a laptop, notebook, and financial charts showing income breakdowns">
+            </div>
+        </section>
+
+        <section class="features-section">
+            <h2>What it does</h2>
+            <p class="features-intro">Tap a card to see it in action.</p>
+            <div class="features-grid">
+                <button type="button" class="feature-card" data-detail="Clock in on the dashboard and a running total appears immediately, ticking upward every second using your real hourly rate — split into minute-by-minute pay so it feels genuinely live instead of refreshing once a minute.">
+                    <div class="feature-icon">⏱️</div>
+                    <h3>Live Earnings Tracker</h3>
+                    <p>Watch a running total of what you've earned today, ticking in real time.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="The moment your total hours for a job cross 40 in a week, every additional minute is automatically paid at 1.5x — time and a half — with zero manual math and no separate 'overtime mode' to remember to turn on.">
+                    <div class="feature-icon">📈</div>
+                    <h3>Automatic Overtime</h3>
+                    <p>Crosses 40 hrs/week and your rate bumps to time-and-a-half automatically.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Hit Start Lunch when you step away and End Lunch when you're back. That time is automatically subtracted from your paid hours, so the live total — and your final shift pay — always match what you're actually owed.">
+                    <div class="feature-icon">🍽️</div>
+                    <h3>Lunch Break Aware</h3>
+                    <p>Logged breaks are excluded from paid time automatically.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Commission is tracked separately from your hourly wage, on whatever date it was actually earned — so you can always see exactly how much of a day's total came from your base pay versus commission.">
+                    <div class="feature-icon">💵</div>
+                    <h3>Commission Tracking</h3>
+                    <p>See exactly how much of your day came from commission.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Your effective hourly rate — including commission — is compared live against typical pay for your job title, so you can tell at a glance whether today's work is paying above or below average.">
+                    <div class="feature-icon">📊</div>
+                    <h3>How You Compare</h3>
+                    <p>See how your rate stacks up against typical pay for your job title.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Add bills once, split a big one across several paychecks, or mark it recurring so it regenerates every month. A live progress bar shows what percentage of this month's bills your income so far has already covered.">
+                    <div class="feature-icon">🧾</div>
+                    <h3>Budget &amp; Bills</h3>
+                    <p>Split payments, set up recurring bills, and track what's covered.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Shift history is grouped into your real biweekly pay periods, anchored to whichever start date you set — not arbitrary calendar chunks — so what you see lines up with the paycheck that's actually coming.">
+                    <div class="feature-icon">📅</div>
+                    <h3>Real Pay Periods</h3>
+                    <p>Shift history grouped into your actual biweekly pay periods.</p>
+                </button>
+                <button type="button" class="feature-card" data-detail="Set a dollar target and WageTracker works backward: after subtracting this month's bills, it tells you how many more hours, repairs, or sales you'd need to hit your goal by the end of the month.">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Savings Goals</h3>
+                    <p>See exactly how many more hours or sales you need to hit a goal.</p>
+                </button>
+            </div>
+            <div class="feature-detail-box" id="feature-detail-box">
+                <p>👆 Tap any card above to see exactly how it works.</p>
+            </div>
+        </section>
+
+        <section class="how-it-works-section">
+            <h2>How it works</h2>
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Create your account</h3>
+                    <p>Sign up in seconds — just an email and password.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Add your job(s)</h3>
+                    <p>Enter your job title and hourly wage. Add more than one if you work multiple jobs.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Clock in</h3>
+                    <p>Hit Clock In when you start your shift and watch your earnings update live as you work.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>Stay on top of it</h3>
+                    <p>Check your totals, log commission, track bills, and see how your pay compares — all in one place.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="faq-section">
+            <h2>Questions</h2>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <button class="faq-question" type="button">
+                        Is this actually free?
+                        <span class="faq-caret">＋</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Yes. There's no paid tier, no trial period, and no credit card required to sign up.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" type="button">
+                        How does overtime get calculated?
+                        <span class="faq-caret">＋</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Once your total hours for a single job cross 40 in a calendar week, every hour after that is automatically paid at 1.5x (time and a half) — the same standard formula most hourly employers use.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" type="button">
+                        Can I track more than one job?
+                        <span class="faq-caret">＋</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Yes. Add as many jobs as you want, each with its own hourly wage — overtime is tracked separately per job since hours don't share a single weekly pool.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" type="button">
+                        What happens to my data?
+                        <span class="faq-caret">＋</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Your shifts, commission, and bills are stored under your own account and only visible to you. You can edit or delete anything you've logged at any time.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question" type="button">
+                        Do I need to install anything?
+                        <span class="faq-caret">＋</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>No. WageTracker runs entirely in your browser — no app store, no download.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="final-cta-section">
+            <h2>Stop wondering what you're making.</h2>
+            <p>It takes less than a minute to set up.</p>
+            <a href="create_account.html" class="cta-primary">Create Your Free Account</a>
+        </section>
+
+    </main>
+
+    <footer class="site-footer">
+        <p>WageTracker — a personal project built to track hourly wages, commission, and budgets in one place.</p>
+    </footer>
+
+    <a href="create_account.html" class="floating-cta" id="floating-cta">Get Started Free</a>
+
+    <script>
+        // ============================================================
+        // LIVE DEMO WIDGET
+        // ============================================================
+        // Mirrors the real dashboard's "minute wage + commission" live
+        // counter formula, but sped up (1 simulated hour ≈ a few real
+        // seconds) so a visitor can actually see overtime kick in without
+        // waiting. Nothing here calls Supabase or touches a real account.
+        (function () {
+            const wageInput = document.getElementById('demo-wage');
+            const commissionInput = document.getElementById('demo-commission');
+            const addCommissionBtn = document.getElementById('demo-add-commission');
+            const clockInBtn = document.getElementById('demo-clock-in');
+            const clockOutBtn = document.getElementById('demo-clock-out');
+            const resetBtn = document.getElementById('demo-reset');
+            const labelEl = document.getElementById('demo-label');
+            const bigNumberEl = document.getElementById('demo-big-number');
+            const breakdownEl = document.getElementById('demo-breakdown');
+            const overtimeFillEl = document.getElementById('demo-overtime-fill');
+            const overtimeNoteEl = document.getElementById('demo-overtime-note');
+
+            const OVERTIME_THRESHOLD = 40;   // hours/week before 1.5x kicks in
+            const OVERTIME_MULTIPLIER = 1.5;
+            const SIMULATED_HOURS_PER_SECOND = 0.6; // speed of the demo clock
+
+            let simulatedHours = 0;
+            let tickInterval = null;
+            let clockedIn = false;
+
+            function formatMoney(n) {
+                return '$' + n.toFixed(2);
+            }
+
+            function computePay(hours, wage) {
+                const regularHours = Math.min(hours, OVERTIME_THRESHOLD);
+                const overtimeHours = Math.max(0, hours - OVERTIME_THRESHOLD);
+                return (regularHours * wage) + (overtimeHours * wage * OVERTIME_MULTIPLIER);
+            }
+
+            function render() {
+                const wage = parseFloat(wageInput.value) || 0;
+                const commission = parseFloat(commissionInput.value) || 0;
+                const wagePay = computePay(simulatedHours, wage);
+                const total = wagePay + commission;
+
+                bigNumberEl.textContent = formatMoney(total);
+                breakdownEl.textContent = `Wages: ${formatMoney(wagePay)} • Commission: ${formatMoney(commission)}`;
+
+                const pct = Math.min(100, (simulatedHours / OVERTIME_THRESHOLD) * 100);
+                overtimeFillEl.style.width = pct + '%';
+                overtimeFillEl.classList.toggle('over', simulatedHours > OVERTIME_THRESHOLD);
+
+                if (simulatedHours > OVERTIME_THRESHOLD) {
+                    overtimeNoteEl.textContent = `${simulatedHours.toFixed(1)} hrs this week — earning 1.5x overtime now`;
+                    overtimeNoteEl.classList.add('over');
+                } else {
+                    overtimeNoteEl.textContent = `${simulatedHours.toFixed(1)} hrs this week — overtime kicks in at 40`;
+                    overtimeNoteEl.classList.remove('over');
+                }
+            }
+
+            addCommissionBtn.addEventListener('click', () => {
+                commissionInput.value = (parseFloat(commissionInput.value) || 0) + 5;
+                render();
+            });
+
+            commissionInput.addEventListener('input', render);
+            wageInput.addEventListener('input', render);
+
+            clockInBtn.addEventListener('click', () => {
+                if (clockedIn) return;
+                clockedIn = true;
+                clockInBtn.disabled = true;
+                clockOutBtn.disabled = false;
+                labelEl.textContent = "Clocked in — earnings ticking live";
+                labelEl.classList.add('demo-live');
+
+                tickInterval = setInterval(() => {
+                    simulatedHours += SIMULATED_HOURS_PER_SECOND / 10;
+                    render();
+                    bigNumberEl.classList.remove('tick');
+                    void bigNumberEl.offsetWidth;
+                    bigNumberEl.classList.add('tick');
+                }, 100);
+            });
+
+            clockOutBtn.addEventListener('click', () => {
+                if (!clockedIn) return;
+                clockedIn = false;
+                clearInterval(tickInterval);
+                clockInBtn.disabled = false;
+                clockOutBtn.disabled = true;
+                labelEl.textContent = 'Clocked out';
+                labelEl.classList.remove('demo-live');
+            });
+
+            resetBtn.addEventListener('click', () => {
+                clockedIn = false;
+                clearInterval(tickInterval);
+                simulatedHours = 0;
+                commissionInput.value = 0;
+                clockInBtn.disabled = false;
+                clockOutBtn.disabled = true;
+                labelEl.textContent = 'Ready to clock in';
+                labelEl.classList.remove('demo-live');
+                render();
+            });
+
+            render();
+        })();
+
+        // ============================================================
+        // FEATURE CARDS — tap to expand detail
+        // ============================================================
+        (function () {
+            const cards = document.querySelectorAll('.feature-card');
+            const detailBox = document.getElementById('feature-detail-box');
+
+            cards.forEach(card => {
+                card.addEventListener('click', () => {
+                    cards.forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    const title = card.querySelector('h3').textContent;
+                    const detail = card.getAttribute('data-detail');
+                    detailBox.innerHTML = `<strong>${title}:</strong> ${detail}`;
+                    detailBox.classList.add('filled');
+                });
+            });
+        })();
+
+        // ============================================================
+        // FAQ ACCORDION
+        // ============================================================
+        (function () {
+            document.querySelectorAll('.faq-question').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const item = btn.closest('.faq-item');
+                    const wasOpen = item.classList.contains('open');
+                    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+                    if (!wasOpen) item.classList.add('open');
+                });
+            });
+        })();
+
+        // ============================================================
+        // SCROLL-REVEAL ANIMATIONS
+        // ============================================================
+        (function () {
+            const revealTargets = document.querySelectorAll(
+                '.feature-card, .step-card, .demo-card, .faq-item'
+            );
+            revealTargets.forEach(el => el.classList.add('reveal'));
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('reveal-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.15 });
+
+            revealTargets.forEach(el => observer.observe(el));
+        })();
+
+        // ============================================================
+        // FLOATING "GET STARTED" BUTTON — appears after scrolling past hero
+        // ============================================================
+        (function () {
+            const floatingBtn = document.getElementById('floating-cta');
+            const hero = document.querySelector('.hero');
+
+            window.addEventListener('scroll', () => {
+                const heroBottom = hero.getBoundingClientRect().bottom;
+                floatingBtn.classList.toggle('visible', heroBottom < 0);
+            });
+        })();
+    </script>
+
+</body>
+</html>
