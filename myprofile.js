@@ -140,6 +140,13 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
 
     // ---- validation before contacting Supabase ----
 
+    // a name with no space means there is no last name, and the dashboard needs both
+    if (name && !name.includes(' ')) {
+        statusEl.textContent = 'Please enter your first AND last name (example: Valdyr Pierre).';
+        statusEl.style.color = '#dc2626';
+        return;
+    }
+
     if (name.length > 100) {
         statusEl.textContent = 'Name is too long (max 100 characters).';
         statusEl.style.color = '#dc2626';
