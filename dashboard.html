@@ -37,11 +37,6 @@
 
     <main>
 
-        <section class="job-select-section" id="job-select-section" style="display:none;">
-            <label for="active-job">Clocking in as:</label>
-            <select id="active-job"></select>
-        </section>
-
         <section class="clock-section">
             <button id="clock-in">Clock In</button>
             <button id="clock-out" disabled>Clock Out</button>
@@ -103,10 +98,7 @@
                     <span class="value" id="total-year">$0.00</span>
                 </div>
             </div>
-            <div class="tax-rate-setting">
-                <label for="tax-rate">Estimated tax rate:</label>
-                <input type="number" id="tax-rate" min="0" max="100" value="20">%
-            </div>
+            <p class="hint">"After Tax" takes out the 5% Massachusetts state income tax only (not federal or FICA).</p>
         </section>
 
         <section class="income-monthly-graph">
