@@ -4,24 +4,66 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let currentUser = null;
-        let userJobs = [];
+        let userJob = null;
         let selectedJobId = null;
         let activeShift = null; // { id, job_id, clock_in }
         let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
         let liveTimerInterval = null;
+        let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
+        let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
+        let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let avgLookupCache = {};        // job_title(lowercase) -> average_wage, fetched once
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
         const MONTHS_BACK = 6;          // how many months of history to show
+        let employment = null;          // employment info for the current user, if any
         // NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
         // getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
         // all now live in shared.js (loaded before this file) so every page
         // uses the exact same overtime/break logic.
 
+        function obtainCurrentUserInfo( firstname, lastname, email, userId ) 
+        {
+            // if we obtain the info successfully we inform the user by showing a pop up on the screen saying
+            // - welcome back firstname lastname
+            switch (true) {
+                case !firstname:
+                    return alert('Error: Missing firstname');
+                case !lastname:
+                    return alert('Error: Missing lastname');
+                case !email:
+                    return alert('Error: Missing email');
+                case !userId:
+                    return alert('Error: Missing userId');
+                default:
+                    currentUser = { firstname, lastname, email, userId };
+                    return alert(`Welcome back ${firstname} ${lastname}`);
+            }    
+        }
+
+        function getUserEmploymentInfo(userJob)
+        {
+            // first it will scan the database to see if the user has any employment info
+            // if the user has employment info it will return the info
+            // if the user has no employment info a pop up will come up
+            // this pop up will ask the user to input his employment info
+
+            switch (true) {
+                case !userJob:
+                    // the return will initiate the pop up
+                    return alert('alert: No employment info found. Please input your employment info.');
+                default:
+                    return userJob;
+            }
+        }
+
         function todayStr() {
+            // uses the LOCAL date (toISOString would give tomorrow's date after about 8pm Eastern)
             const d = new Date();
-            return d.toISOString().split('T')[0];
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${d.getFullYear()}-${month}-${day}`;
         }
 
         // Parses a "YYYY-MM-DD" string (like the value from a date input) as
@@ -34,18 +76,15 @@
             return new Date(year, month - 1, day);
         }
 
-        function getTaxRate() {
-            const raw = parseFloat(document.getElementById('tax-rate').value) || 0;
-            // clamp to a sane 0-100% range so a stray typo (like "150" or a
-            // negative number) can't produce a nonsensical after-tax amount
-            const clamped = Math.min(Math.max(raw, 0), 100);
-            return clamped / 100;
-        }
-
-        function applyTax(amount, sectionKey) {
+        // this will be responsible for applying tax to the amount earned so far
+        // i will use encapsulation to make the code more maintainable and readable
+        // i will use this function to apply the massachusetts calculation which is 5% of the amount earned
+        function calculateTax(amount, sectionKey) 
+        {
             if (showAfterTax[sectionKey]) {
-                return amount * (1 - getTaxRate());
+                return amount * 0.95; // 5% tax deduction
             }
+            // this amount will be shown whenever the user wants to see the amount after tax
             return amount;
         }
 
@@ -54,50 +93,50 @@
             document.getElementById('view-date').value = todayStr();
             document.getElementById('commission-date').value = todayStr();
 
+            // first we find out who is logged in
             const { data: { user }, error } = await supabaseClient.auth.getUser();
             if (error || !user) {
                 window.location.href = 'login.html';
                 return;
             }
-            currentUser = user;
-            document.getElementById('user-name').textContent = user.email;
 
+            // the profile page saves ONE full_name, so we split it into firstname and lastname here
+            const fullName = (user.user_metadata?.full_name || '').trim();
+            const [firstname, ...otherNames] = fullName.split(' ');
+            const lastname = otherNames.join(' ');
+
+            // sign up does not ask for a name, so a new account has none yet. send them to the profile page to add it
+            if (!firstname || !lastname) {
+                alert('Please add your first and last name on the Profile page.');
+                window.location.href = 'myprofile.html';
+                return;
+            }
+
+            obtainCurrentUserInfo(firstname, lastname, user.email, user.id);
+            if (!currentUser) return; // something was missing, the pop up already told the user
+            document.getElementById('user-name').textContent = firstname + ' ' + lastname;
+
+            // second we ask the database for the user's job
             const { data: jobs, error: jobsError } = await supabaseClient
                 .from('jobs')
                 .select('*')
-                .eq('user_id', user.id);
+                .eq('user_id', currentUser.userId)
+                .order('created_at', { ascending: true })
+                .limit(1);
 
-            if (jobsError || !jobs || jobs.length === 0) {
-                document.getElementById('job-title-display').textContent = 'No job info found';
-                userJobs = [];
-            } else {
-                userJobs = jobs;
-                if (jobs.length === 1) {
-                    document.getElementById('job-title-display').textContent = jobs[0].job_title;
-                    selectedJobId = jobs[0].id;
-                } else {
-                    document.getElementById('job-title-display').textContent = jobs.length + ' jobs';
-                    const jobSelectSection = document.getElementById('job-select-section');
-                    const select = document.getElementById('active-job');
-                    jobs.forEach(j => {
-                        const opt = document.createElement('option');
-                        opt.value = j.id;
-                        opt.textContent = j.job_title + ' ($' + j.hourly_wage + '/hr)';
-                        select.appendChild(opt);
-                    });
-                    jobSelectSection.style.display = 'block';
-                    selectedJobId = jobs[0].id;
-                    select.addEventListener('change', async () => {
-                        selectedJobId = select.value;
-                        // the work tracker's rate hint, daily entry, and summary
-                        // are all specific to whichever job is selected
-                        if (typeof initWorkTracker === 'function') {
-                            await initWorkTracker();
-                        }
-                    });
-                }
+            if (jobsError) {
+                return alert('Error loading your job: ' + jobsError.message);
             }
 
+            userJob = getUserEmploymentInfo(jobs[0]);
+            if (!userJob) {
+                document.getElementById('job-title-display').textContent = 'No job info found';
+                return;
+            }
+            selectedJobId = userJob.id;
+            document.getElementById('job-title-display').textContent = userJob.job_title;
+
+            // third we load everything that needs the job
             await renderComparison();
             await loadTodaysCommissions();
             await loadCommissionEntriesForDate(todayStr());
@@ -107,8 +146,10 @@
             await renderMonthlyChart();
         }
 
+        // there is only one job now, so this just hands back userJob
+        // (kept so the code that calls it reads the same as before)
         function getSelectedJob() {
-            return userJobs.find(j => String(j.id) === String(selectedJobId));
+            return userJob;
         }
 
         // fetches today's commission entries and sums them per job_id, for use in the live effective-rate comparison
@@ -116,7 +157,7 @@
             const { data, error } = await supabaseClient
                 .from('commissions')
                 .select('job_id, amount')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('entry_date', todayStr());
 
             todaysCommissionByJob = {};
@@ -137,8 +178,8 @@
 
             const { data, error } = await supabaseClient
                 .from('shifts')
-                .select('clock_in, clock_out')
-                .eq('user_id', currentUser.id)
+                .select('id, clock_in, clock_out')
+                .eq('user_id', currentUser.userId)
                 .eq('job_id', jobId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', weekStart.toISOString())
@@ -146,9 +187,16 @@
 
             if (error || !data) return 0;
 
+            // take the lunch breaks out the same way the totals do, so the live counter and the totals agree
+            const breaksByShiftId = await fetchBreaksByShiftId(data.map(s => s.id));
+
             return data.reduce((sum, s) => {
-                const hours = (new Date(s.clock_out) - new Date(s.clock_in)) / (1000 * 60 * 60);
-                return sum + hours;
+                const rawHours = (new Date(s.clock_out) - new Date(s.clock_in)) / (1000 * 60 * 60);
+                const breakHours = (breaksByShiftId.get(s.id) || []).reduce((breakSum, b) => {
+                    if (!b.break_end) return breakSum; // a break that was never closed does not count
+                    return breakSum + (new Date(b.break_end) - new Date(b.break_start)) / (1000 * 60 * 60);
+                }, 0);
+                return sum + Math.max(0, rawHours - breakHours);
             }, 0);
         }
 
@@ -157,7 +205,7 @@
             const { data, error } = await supabaseClient
                 .from('shifts')
                 .select('*')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .is('clock_out', null)
                 .order('clock_in', { ascending: false })
                 .limit(1);
@@ -226,7 +274,7 @@
             const { data: existingOpenShifts } = await supabaseClient
                 .from('shifts')
                 .select('id')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .is('clock_out', null)
                 .limit(1);
 
@@ -239,7 +287,7 @@
             const clockInTime = new Date().toISOString();
             const { data, error } = await supabaseClient
                 .from('shifts')
-                .insert([{ user_id: currentUser.id, job_id: selectedJobId, clock_in: clockInTime }])
+                .insert([{ user_id: currentUser.userId, job_id: selectedJobId, clock_in: clockInTime }])
                 .select();
 
             if (error) {
@@ -283,6 +331,7 @@
             clearInterval(liveTimerInterval);
             const clockedOutJob = getSelectedJob();
             activeShift = null;
+            liveShiftWage = 0;
             document.getElementById('clock-in').disabled = false;
             document.getElementById('clock-out').disabled = true;
             document.getElementById('start-lunch-btn').disabled = true;
@@ -305,7 +354,7 @@
             const { data, error } = await supabaseClient
                 .from('breaks')
                 .insert([{
-                    user_id: currentUser.id,
+                    user_id: currentUser.userId,
                     shift_id: activeShift.id,
                     break_start: new Date().toISOString()
                 }])
@@ -365,7 +414,7 @@
             const { data: todaysShifts, error: shiftsError } = await supabaseClient
                 .from('shifts')
                 .select('id')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .gte('clock_in', todayStart.toISOString())
                 .lt('clock_in', tomorrow.toISOString());
 
@@ -447,17 +496,16 @@
             const startValue = row.querySelector('.edit-break-start').value;
             const endValue = row.querySelector('.edit-break-end').value;
 
-            if (!startValue) {
-                statusEl.textContent = 'Start time is required.';
-                return;
-            }
-
-            const startDate = new Date(startValue);
+            const startDate = startValue ? new Date(startValue) : null;
             const endDate = endValue ? new Date(endValue) : null;
 
-            if (endDate && endDate <= startDate) {
-                statusEl.textContent = 'End time must be after start time.';
-                return;
+            switch (true) {
+                case !startDate:
+                    statusEl.textContent = 'Start time is required.';
+                    return;
+                case endDate && endDate <= startDate:
+                    statusEl.textContent = 'End time must be after start time.';
+                    return;
             }
 
             const { error } = await supabaseClient
@@ -536,11 +584,14 @@
                 const overtimeMinutes = elapsedMinutes - regularMinutes;
                 const wagePay = (regularMinutes * minuteWage) + (overtimeMinutes * minuteWage * OVERTIME_MULTIPLIER);
 
+                liveShiftWage = wagePay; // lets the Day / Week / Month / Year totals follow the running shift
+                renderTotals();
+
                 const commissionSoFar = job ? (todaysCommissionByJob[String(job.id)] || 0) : 0;
                 const pay = wagePay + commissionSoFar; // live tracker = minute wage (worked out) + commission
 
                 const payDisplay = document.getElementById('live-pay');
-                payDisplay.textContent = formatMoney(applyTax(pay, 'constantpay'));
+                payDisplay.textContent = formatMoney(calculateTax(pay, 'constantpay'));
                 payDisplay.classList.remove('tick');
                 void payDisplay.offsetWidth; // restart animation
                 payDisplay.classList.add('tick');
@@ -562,28 +613,25 @@
             const statusEl = document.getElementById('commission-status');
             const MAX_REASONABLE_COMMISSION = 100000;
 
-            if (!selectedJobId) {
-                statusEl.textContent = 'Add a job in User Info before logging commission.';
-                statusEl.style.color = '#dc2626';
-                return;
-            }
-
-            if (isNaN(amount) || amount <= 0) {
-                statusEl.textContent = 'Enter a valid commission amount.';
-                statusEl.style.color = '#dc2626';
-                return;
-            }
-
-            if (amount > MAX_REASONABLE_COMMISSION) {
-                statusEl.textContent = `That amount seems too high — please double-check it.`;
-                statusEl.style.color = '#dc2626';
-                return;
+            switch (true) {
+                case !selectedJobId:
+                    statusEl.textContent = 'Add a job in User Info before logging commission.';
+                    statusEl.style.color = '#dc2626';
+                    return;
+                case isNaN(amount) || amount <= 0:
+                    statusEl.textContent = 'Enter a valid commission amount.';
+                    statusEl.style.color = '#dc2626';
+                    return;
+                case amount > MAX_REASONABLE_COMMISSION:
+                    statusEl.textContent = `That amount seems too high — please double-check it.`;
+                    statusEl.style.color = '#dc2626';
+                    return;
             }
 
             const { error } = await supabaseClient
                 .from('commissions')
                 .insert([{
-                    user_id: currentUser.id,
+                    user_id: currentUser.userId,
                     job_id: selectedJobId,
                     amount: amount,
                     entry_date: entryDate
@@ -615,7 +663,7 @@
             const { data, error } = await supabaseClient
                 .from('commissions')
                 .select('id, amount, job_id, jobs(job_title)')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('entry_date', dateStr)
                 .order('id', { ascending: true });
 
@@ -730,6 +778,30 @@
             }
         }
 
+        // the first moment AFTER a period ends (the end itself is not part of the period)
+        function getRangeEnd(period, start) {
+            if (period === 'day') {
+                return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+            }
+            if (period === 'week') {
+                return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+            }
+            if (period === 'month') {
+                return new Date(start.getFullYear(), start.getMonth() + 1, 1);
+            }
+            if (period === 'year') {
+                return new Date(start.getFullYear() + 1, 0, 1);
+            }
+        }
+
+        // midnight at the START of tomorrow. the end of a range is not included, so using this
+        // as the end makes sure everything from today counts (including today's commission)
+        function getTomorrowStart() {
+            const tomorrow = parseLocalDate(todayStr());
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow;
+        }
+
         async function computeShiftsPay(startDate, endDate) {
             // fetch from the start of the week containing startDate, so weekly overtime
             // accumulation is calculated correctly even if the period starts mid-week
@@ -738,7 +810,7 @@
             const { data: shifts, error } = await supabaseClient
                 .from('shifts')
                 .select('*, jobs(hourly_wage)')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', fetchFrom.toISOString())
                 .lt('clock_in', endDate.toISOString());
@@ -762,7 +834,7 @@
             const { data: commissions, error } = await supabaseClient
                 .from('commissions')
                 .select('amount, entry_date')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .gte('entry_date', startDate.toISOString().split('T')[0])
                 .lt('entry_date', endDate.toISOString().split('T')[0]);
 
@@ -772,8 +844,6 @@
 
         async function refreshTotals() {
             const refDate = parseLocalDate(document.getElementById('view-date').value || todayStr());
-            const now = new Date(refDate);
-            now.setDate(now.getDate() + 1); // end-exclusive for "day"
 
             let dayWagePay = 0;
             let dayCommissionPay = 0;
@@ -781,14 +851,13 @@
             const periods = ['day', 'week', 'month', 'year'];
             for (const period of periods) {
                 const start = getRangeStart(period, refDate);
-                const end = period === 'day' ? now : new Date(); // week/month/year run through "now" relative to today
-                const endBound = period === 'day' ? now : new Date(Math.max(end, now));
+                const end = getRangeEnd(period, start); // day = next midnight, week = +7 days, month/year = next month/year
 
-                const shiftsPay = await computeShiftsPay(start, period === 'day' ? now : new Date(refDate.getFullYear() + 1, 0, 1));
-                const commissionPay = await computeCommissions(start, period === 'day' ? now : new Date(refDate.getFullYear() + 1, 0, 1));
-                const total = applyTax(shiftsPay + commissionPay, 'pay-section');
-
-                document.getElementById('total-' + period).textContent = formatMoney(total);
+                const shiftsPay = await computeShiftsPay(start, end);
+                const commissionPay = await computeCommissions(start, end);
+                // remember the before-tax total, so the live timer can add the running shift on top of it
+                totalsBase[period] = shiftsPay + commissionPay;
+                totalsRanges[period] = { start: start, end: end };
 
                 if (period === 'day') {
                     dayWagePay = shiftsPay;
@@ -796,11 +865,36 @@
                 }
             }
 
+            renderTotals();
+
             // both the big number AND the breakdown line follow whichever date
             // is selected in the "Viewing:" picker — if that date is today AND
             // there's an active shift, the live timer keeps controlling the
             // number instead (handled inside this function)
             updateEarningsBox(refDate, dayWagePay, dayCommissionPay);
+        }
+
+        // first it will take the saved totals for each period, then if a shift is running
+        // right now it will add what that shift has earned so far to every period it falls
+        // inside, and finally it will apply the tax toggle and show the numbers.
+        // the live timer calls this every second, so the totals move while you work
+        function renderTotals() {
+            const periods = ['day', 'week', 'month', 'year'];
+            periods.forEach(period => {
+                if (totalsBase[period] === undefined) return;
+
+                let total = totalsBase[period];
+
+                if (activeShift) {
+                    const clockIn = new Date(activeShift.clock_in);
+                    const range = totalsRanges[period];
+                    if (clockIn >= range.start && clockIn < range.end) {
+                        total += liveShiftWage;
+                    }
+                }
+
+                document.getElementById('total-' + period).textContent = formatMoney(calculateTax(total, 'pay-section'));
+            });
         }
 
         // On TODAY: shows the big live counter (ticking in real time if clocked
@@ -828,14 +922,14 @@
                     return; // live timer owns the big number itself, don't overwrite it
                 }
 
-                const total = applyTax(wagePay + commissionPay, 'constantpay');
+                const total = calculateTax(wagePay + commissionPay, 'constantpay');
                 bigNumberEl.textContent = formatMoney(total);
             } else {
                 // not today — hide the single combined number, show wage/commission
                 // as two separate figures instead
                 bigNumberEl.style.display = 'none';
                 breakdownEl.classList.add('breakdown-primary');
-                breakdownEl.innerHTML = `<span>Wages: ${formatMoney(applyTax(wagePay, 'constantpay'))}</span><span>Commission: ${formatMoney(applyTax(commissionPay, 'constantpay'))}</span>`;
+                breakdownEl.innerHTML = `<span>Wages: ${formatMoney(calculateTax(wagePay, 'constantpay'))}</span><span>Commission: ${formatMoney(calculateTax(commissionPay, 'constantpay'))}</span>`;
                 labelEl.textContent = `Earnings for ${refDate.toLocaleDateString()}`;
             }
         }
@@ -850,7 +944,6 @@
             btn.textContent = originalText;
             btn.disabled = false;
         });
-        document.getElementById('tax-rate').addEventListener('input', refreshTotals);
 
         // ---------- TAX TOGGLES ----------
         document.querySelectorAll('.tax-toggle').forEach(btn => {
@@ -872,17 +965,11 @@
             const container = document.getElementById('comparison-list');
             container.innerHTML = '';
 
-            if (userJobs.length === 0) {
-                container.textContent = 'Add a job in User Info to see a comparison.';
-                return;
-            }
-
             // fetch reference wage data once and cache it (avoids re-querying every second)
-            const titles = userJobs.map(j => j.job_title);
             const { data: averages, error } = await supabaseClient
                 .from('job_averages')
                 .select('job_title, average_wage')
-                .in('job_title', titles);
+                .eq('job_title', userJob.job_title);
 
             if (error) {
                 container.textContent = 'Could not load comparison data.';
@@ -894,13 +981,11 @@
                 avgLookupCache[a.job_title.toLowerCase().trim()] = parseFloat(a.average_wage);
             });
 
-            userJobs.forEach(job => {
-                const row = document.createElement('div');
-                row.className = 'comparison-row';
-                row.id = 'comparison-row-' + job.id;
-                container.appendChild(row);
-                updateComparisonRow(job, parseFloat(job.hourly_wage), false);
-            });
+            const row = document.createElement('div');
+            row.className = 'comparison-row';
+            row.id = 'comparison-row-' + userJob.id;
+            container.appendChild(row);
+            updateComparisonRow(userJob, parseFloat(userJob.hourly_wage), false);
         }
 
         // updates a single job's comparison row using whatever rate is passed in
@@ -955,14 +1040,14 @@
             const { data: shifts } = await supabaseClient
                 .from('shifts')
                 .select('id, job_id, clock_in, clock_out, jobs(hourly_wage)')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', earliest.toISOString());
 
             const { data: commissions } = await supabaseClient
                 .from('commissions')
                 .select('amount, entry_date')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .gte('entry_date', earliest.toISOString().split('T')[0]);
 
             // compute overtime-aware pay per shift once, up front
@@ -983,14 +1068,14 @@
 
                 let commissionTotal = 0;
                 (commissions || []).forEach(c => {
-                    const entryDate = new Date(c.entry_date);
+                    const entryDate = parseLocalDate(c.entry_date);
                     if (entryDate >= start && entryDate < end) {
                         commissionTotal += parseFloat(c.amount);
                     }
                 });
 
-                wageData.push(applyTax(wageTotal, 'income-monthly-graph'));
-                commissionData.push(applyTax(commissionTotal, 'income-monthly-graph'));
+                wageData.push(calculateTax(wageTotal, 'income-monthly-graph'));
+                commissionData.push(calculateTax(commissionTotal, 'income-monthly-graph'));
             }
 
             return { labels, wageData, commissionData };
@@ -1107,7 +1192,7 @@
             const { data, error } = await supabaseClient
                 .from('daily_metrics')
                 .select('*')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('job_id', selectedJobId)
                 .eq('entry_date', dateStr)
                 .maybeSingle();
@@ -1162,20 +1247,20 @@
             const reviews = parseInt(document.getElementById('entry-reviews').value, 10) || 0;
             const notes = document.getElementById('entry-notes').value.trim();
 
-            if (!dateStr) {
-                statusEl.textContent = 'Please choose a date.';
-                return;
-            }
-            if (reviews > customers && customers > 0) {
-                statusEl.textContent = '5-star reviews can\'t exceed total customers.';
-                return;
+            switch (true) {
+                case !dateStr:
+                    statusEl.textContent = 'Please choose a date.';
+                    return;
+                case reviews > customers && customers > 0:
+                    statusEl.textContent = '5-star reviews can\'t exceed total customers.';
+                    return;
             }
 
             // 1) Upsert the business metrics (phones/signups/customers/reviews/notes)
             const { error: metricsError } = await supabaseClient
                 .from('daily_metrics')
                 .upsert([{
-                    user_id: currentUser.id,
+                    user_id: currentUser.userId,
                     job_id: selectedJobId,
                     entry_date: dateStr,
                     phones_repaired: phones,
@@ -1199,7 +1284,7 @@
             await supabaseClient
                 .from('commissions')
                 .delete()
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('job_id', selectedJobId)
                 .eq('entry_date', dateStr)
                 .eq('from_daily_tracker', true);
@@ -1208,7 +1293,7 @@
                 await supabaseClient
                     .from('commissions')
                     .insert([{
-                        user_id: currentUser.id,
+                        user_id: currentUser.userId,
                         job_id: selectedJobId,
                         amount: commissionAmount,
                         entry_date: dateStr,
@@ -1224,7 +1309,7 @@
                 const { data: existingShifts } = await supabaseClient
                     .from('shifts')
                     .select('id')
-                    .eq('user_id', currentUser.id)
+                    .eq('user_id', currentUser.userId)
                     .eq('job_id', selectedJobId)
                     .gte('clock_in', dateStr + 'T00:00:00')
                     .lt('clock_in', dateStr + 'T23:59:59')
@@ -1238,7 +1323,7 @@
                     await supabaseClient
                         .from('shifts')
                         .insert([{
-                            user_id: currentUser.id,
+                            user_id: currentUser.userId,
                             job_id: selectedJobId,
                             clock_in: clockIn.toISOString(),
                             clock_out: clockOut.toISOString()
@@ -1276,7 +1361,7 @@
             const { data } = await supabaseClient
                 .from('daily_metrics')
                 .select('total_customers, five_star_reviews')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('entry_date', dateStr)
                 .maybeSingle();
 
@@ -1290,10 +1375,10 @@
         async function loadWeeklySnapshot() {
             const today = parseLocalDate(todayStr());
             const weekStart = getRangeStart('week', today);
-            const now = new Date();
+            const tomorrow = getTomorrowStart();
 
-            const wagePay = await computeShiftsPay(weekStart, now);
-            const commissionPay = await computeCommissions(weekStart, now);
+            const wagePay = await computeShiftsPay(weekStart, tomorrow);
+            const commissionPay = await computeCommissions(weekStart, tomorrow);
             document.getElementById('snapshot-week-earnings').textContent = formatMoney(wagePay + commissionPay);
         }
 
@@ -1314,7 +1399,7 @@
 
             const { error } = await supabaseClient
                 .from('daily_spending')
-                .insert([{ user_id: currentUser.id, entry_date: dateStr, amount: amount }]);
+                .insert([{ user_id: currentUser.userId, entry_date: dateStr, amount: amount }]);
 
             if (error) {
                 statusEl.textContent = 'Error: ' + error.message;
@@ -1331,7 +1416,7 @@
             const { data } = await supabaseClient
                 .from('daily_spending')
                 .select('amount')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .eq('entry_date', dateStr);
 
             const total = (data || []).reduce((sum, s) => sum + parseFloat(s.amount), 0);
@@ -1357,7 +1442,7 @@
             const { data } = await supabaseClient
                 .from('daily_metrics')
                 .select('phones_repaired, five_star_reviews, total_customers')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .gte('entry_date', start.toISOString().split('T')[0])
                 .lt('entry_date', end.toISOString().split('T')[0]);
 
@@ -1376,14 +1461,14 @@
             const now = new Date();
             const yearStart = new Date(now.getFullYear(), 0, 1);
 
-            const wagePay = await computeShiftsPay(yearStart, now);
-            const commissionPay = await computeCommissions(yearStart, now);
+            const wagePay = await computeShiftsPay(yearStart, getTomorrowStart());
+            const commissionPay = await computeCommissions(yearStart, getTomorrowStart());
             const total = wagePay + commissionPay;
 
             const { data: shifts } = await supabaseClient
                 .from('shifts')
                 .select('clock_in, clock_out')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', yearStart.toISOString());
 
@@ -1412,7 +1497,7 @@
             const { data: bills } = await supabaseClient
                 .from('bills')
                 .select('*')
-                .eq('user_id', currentUser.id)
+                .eq('user_id', currentUser.userId)
                 .gte('due_date', monthStart.toISOString().split('T')[0])
                 .lt('due_date', monthEnd.toISOString().split('T')[0]);
 
@@ -1442,8 +1527,8 @@
             document.getElementById('goal-bills-paid').textContent = formatMoney(billsPaid);
             document.getElementById('goal-bills-left').textContent = formatMoney(billsLeft);
 
-            const wagePay = await computeShiftsPay(monthStart, now);
-            const commissionPay = await computeCommissions(monthStart, now);
+            const wagePay = await computeShiftsPay(monthStart, getTomorrowStart());
+            const commissionPay = await computeCommissions(monthStart, getTomorrowStart());
             const incomeThisMonth = wagePay + commissionPay;
 
             const target = goal + totalBills;
@@ -1481,7 +1566,7 @@
                 const { data } = await supabaseClient
                     .from('daily_metrics')
                     .select('total_customers, five_star_reviews')
-                    .eq('user_id', currentUser.id)
+                    .eq('user_id', currentUser.userId)
                     .gte('entry_date', start.toISOString().split('T')[0])
                     .lt('entry_date', end.toISOString().split('T')[0]);
 
@@ -1537,6 +1622,15 @@
         // initWorkTracker depends on selectedJobId being set by init() first,
         // so it must run after init() fully finishes, not in parallel with it.
         (async () => {
-            await init();
-            await initWorkTracker();
+            // if anything inside init() breaks, the page used to just stay on "Loading..." with no clue why.
+            // now the error is shown right under the title, and also logged in the console (F12)
+            try {
+                await init();
+                if (currentUser && userJob) {
+                    await initWorkTracker();
+                }
+            } catch (err) {
+                console.error('Dashboard failed to load:', err);
+                document.getElementById('job-title-display').textContent = 'Error loading dashboard: ' + err.message;
+            }
         })();
