@@ -13,7 +13,6 @@
         let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
-        let avgLookupCache = {};        // job_title(lowercase) -> average_wage, fetched once
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
         const MONTHS_BACK = 6;          // how many months of history to show
@@ -137,7 +136,6 @@
             document.getElementById('job-title-display').textContent = userJob.job_title;
 
             // third we load everything that needs the job
-            await renderComparison();
             await loadTodaysCommissions();
             await loadCommissionEntriesForDate(todayStr());
             await loadTodaysBreaks();
@@ -152,7 +150,7 @@
             return userJob;
         }
 
-        // fetches today's commission entries and sums them per job_id, for use in the live effective-rate comparison
+        // fetches today's commission entries and sums them per job_id
         async function loadTodaysCommissions() {
             const { data, error } = await supabaseClient
                 .from('commissions')
@@ -329,7 +327,6 @@
             }
 
             clearInterval(liveTimerInterval);
-            const clockedOutJob = getSelectedJob();
             activeShift = null;
             liveShiftWage = 0;
             document.getElementById('clock-in').disabled = false;
@@ -339,9 +336,6 @@
             document.getElementById('lunch-status').textContent = '';
             document.getElementById('clock-status').textContent = 'Not clocked in';
             document.getElementById('clock-status').classList.remove('active');
-            if (clockedOutJob) {
-                updateComparisonRow(clockedOutJob, parseFloat(clockedOutJob.hourly_wage), false);
-            }
             await refreshTotals(); // this now also sets the earnings box to today's total on its own
         });
 
@@ -595,12 +589,6 @@
                 payDisplay.classList.remove('tick');
                 void payDisplay.offsetWidth; // restart animation
                 payDisplay.classList.add('tick');
-
-                if (job) {
-                    const elapsedHoursForRate = elapsedMinutes / 60;
-                    const effectiveRate = elapsedHoursForRate > 0.001 ? pay / elapsedHoursForRate : wage;
-                    updateComparisonRow(job, effectiveRate, true);
-                }
             }, 1000);
         }
 
@@ -960,59 +948,54 @@
             });
         });
 
-        // ---------- WAGE COMPARISON ----------
-        async function renderComparison() {
-            const container = document.getElementById('comparison-list');
-            container.innerHTML = '';
+        // ---------- EDIT JOB TITLE ----------
+        // the "Edit" button next to the job title opens a small form to type a new title
+        document.getElementById('edit-job-btn').addEventListener('click', () => {
+            document.getElementById('edit-job-title-input').value = userJob ? userJob.job_title : '';
+            document.getElementById('edit-job-form').style.display = 'flex';
+            document.getElementById('edit-job-status').textContent = '';
+        });
 
-            // fetch reference wage data once and cache it (avoids re-querying every second)
-            const { data: averages, error } = await supabaseClient
-                .from('job_averages')
-                .select('job_title, average_wage')
-                .eq('job_title', userJob.job_title);
+        document.getElementById('cancel-job-title-btn').addEventListener('click', () => {
+            document.getElementById('edit-job-form').style.display = 'none';
+        });
+
+        document.getElementById('save-job-title-btn').addEventListener('click', async () => {
+            const newTitle = document.getElementById('edit-job-title-input').value.trim();
+            const statusEl = document.getElementById('edit-job-status');
+
+            switch (true) {
+                case !userJob:
+                    statusEl.textContent = 'Add a job in My Jobs first.';
+                    statusEl.style.color = '#dc2626';
+                    return;
+                case !newTitle:
+                    statusEl.textContent = 'Please enter a job title.';
+                    statusEl.style.color = '#dc2626';
+                    return;
+                case newTitle.length > 100:
+                    statusEl.textContent = 'Job title is too long (max 100 characters).';
+                    statusEl.style.color = '#dc2626';
+                    return;
+            }
+
+            const { error } = await supabaseClient
+                .from('jobs')
+                .update({ job_title: newTitle })
+                .eq('id', userJob.id)
+                .eq('user_id', currentUser.userId);
 
             if (error) {
-                container.textContent = 'Could not load comparison data.';
+                statusEl.textContent = 'Error: ' + error.message;
+                statusEl.style.color = '#dc2626';
                 return;
             }
 
-            avgLookupCache = {};
-            (averages || []).forEach(a => {
-                avgLookupCache[a.job_title.toLowerCase().trim()] = parseFloat(a.average_wage);
-            });
-
-            const row = document.createElement('div');
-            row.className = 'comparison-row';
-            row.id = 'comparison-row-' + userJob.id;
-            container.appendChild(row);
-            updateComparisonRow(userJob, parseFloat(userJob.hourly_wage), false);
-        }
-
-        // updates a single job's comparison row using whatever rate is passed in
-        // (the static hourly wage normally, or a live effective rate while clocked in)
-        function updateComparisonRow(job, rate, isLive) {
-            const row = document.getElementById('comparison-row-' + job.id);
-            if (!row) return;
-
-            const key = job.job_title.toLowerCase().trim();
-            const avg = avgLookupCache[key];
-
-            if (avg === undefined) {
-                row.textContent = job.job_title + ': no reference data available';
-                return;
-            }
-
-            const diff = ((rate - avg) / avg) * 100;
-            const diffText = diff >= 0
-                ? `${diff.toFixed(1)}% above average`
-                : `${Math.abs(diff).toFixed(1)}% below average`;
-            const liveTag = isLive ? ' <span class="live-tag">● live</span>' : '';
-
-            row.classList.remove('above', 'below');
-            row.classList.add(diff >= 0 ? 'above' : 'below');
-
-            row.innerHTML = `<strong>${job.job_title}</strong>: $${rate.toFixed(2)}/hr — ${diffText} (avg $${avg.toFixed(2)}/hr)${liveTag}`;
-        }
+            // the database is updated, so now we update the page to match
+            userJob.job_title = newTitle;
+            document.getElementById('job-title-display').textContent = newTitle;
+            document.getElementById('edit-job-form').style.display = 'none';
+        });
 
         // ---------- MONTHLY INCOME CHART ----------
 
