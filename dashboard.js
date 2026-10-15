@@ -12,6 +12,7 @@
         let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
         let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
+        let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
@@ -73,18 +74,6 @@
         function parseLocalDate(dateStr) {
             const [year, month, day] = dateStr.split('-').map(Number);
             return new Date(year, month - 1, day);
-        }
-
-        // this will be responsible for applying tax to the amount earned so far
-        // i will use encapsulation to make the code more maintainable and readable
-        // i will use this function to apply the massachusetts calculation which is 5% of the amount earned
-        function calculateTax(amount, sectionKey) 
-        {
-            if (showAfterTax[sectionKey]) {
-                return amount * 0.95; // 5% tax deduction
-            }
-            // this amount will be shown whenever the user wants to see the amount after tax
-            return amount;
         }
 
         // ---------- INIT ----------
@@ -585,7 +574,9 @@
                 const pay = wagePay + commissionSoFar; // live tracker = minute wage (worked out) + commission
 
                 const payDisplay = document.getElementById('live-pay');
-                payDisplay.textContent = formatMoney(calculateTax(pay, 'constantpay'));
+                // if the user chose "Show After Tax" we keep (100 - tax%) of the pay, otherwise we keep all of it
+                const keepShare = showAfterTax['constantpay'] ? 1 - taxRate / 100 : 1;
+                payDisplay.textContent = formatMoney(pay * keepShare);
                 payDisplay.classList.remove('tick');
                 void payDisplay.offsetWidth; // restart animation
                 payDisplay.classList.add('tick');
@@ -881,7 +872,8 @@
                     }
                 }
 
-                document.getElementById('total-' + period).textContent = formatMoney(calculateTax(total, 'pay-section'));
+                const keepShare = showAfterTax['pay-section'] ? 1 - taxRate / 100 : 1; // the share left after the tax % the user typed
+                document.getElementById('total-' + period).textContent = formatMoney(total * keepShare);
             });
         }
 
@@ -910,14 +902,16 @@
                     return; // live timer owns the big number itself, don't overwrite it
                 }
 
-                const total = calculateTax(wagePay + commissionPay, 'constantpay');
+                const keepShare = showAfterTax['constantpay'] ? 1 - taxRate / 100 : 1;
+                const total = (wagePay + commissionPay) * keepShare;
                 bigNumberEl.textContent = formatMoney(total);
             } else {
                 // not today — hide the single combined number, show wage/commission
                 // as two separate figures instead
                 bigNumberEl.style.display = 'none';
                 breakdownEl.classList.add('breakdown-primary');
-                breakdownEl.innerHTML = `<span>Wages: ${formatMoney(calculateTax(wagePay, 'constantpay'))}</span><span>Commission: ${formatMoney(calculateTax(commissionPay, 'constantpay'))}</span>`;
+                const keepShare = showAfterTax['constantpay'] ? 1 - taxRate / 100 : 1;
+                breakdownEl.innerHTML = `<span>Wages: ${formatMoney(wagePay * keepShare)}</span><span>Commission: ${formatMoney(commissionPay * keepShare)}</span>`;
                 labelEl.textContent = `Earnings for ${refDate.toLocaleDateString()}`;
             }
         }
@@ -931,6 +925,26 @@
             await refreshTotals();
             btn.textContent = originalText;
             btn.disabled = false;
+        });
+
+        // ---------- TAX RATE BOX ----------
+        // whenever the tax rate changes we update every number that can show after tax
+        document.getElementById('tax-rate').addEventListener('input', () => {
+            const typedRate = parseFloat(document.getElementById('tax-rate').value);
+
+            switch (true) {
+                case isNaN(typedRate) || typedRate < 0:
+                    taxRate = 0; // empty or negative box means no tax taken out
+                    break;
+                case typedRate > 100:
+                    taxRate = 100; // can't take out more than everything
+                    break;
+                default:
+                    taxRate = typedRate;
+            }
+
+            refreshTotals();
+            renderMonthlyChart();
         });
 
         // ---------- TAX TOGGLES ----------
@@ -1057,8 +1071,9 @@
                     }
                 });
 
-                wageData.push(calculateTax(wageTotal, 'income-monthly-graph'));
-                commissionData.push(calculateTax(commissionTotal, 'income-monthly-graph'));
+                const keepShare = showAfterTax['income-monthly-graph'] ? 1 - taxRate / 100 : 1;
+                wageData.push(wageTotal * keepShare);
+                commissionData.push(commissionTotal * keepShare);
             }
 
             return { labels, wageData, commissionData };
