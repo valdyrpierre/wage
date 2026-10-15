@@ -13,6 +13,7 @@
         let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
+        let summaryBase = null; // the Daily Summary's saved wage + commission for its date, plus the date range, so the live timer can add the running shift on top
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
@@ -851,6 +852,10 @@
             // there's an active shift, the live timer keeps controlling the
             // number instead (handled inside this function)
             updateEarningsBox(refDate, dayWagePay, dayCommissionPay);
+
+            // the Daily Summary shows the date picked in the Daily Entry form (today to start).
+            // clock out, commission and break changes all come through here, so it stays up to date
+            await loadDailySummaryForDate(document.getElementById('entry-date').value || todayStr());
         }
 
         // first it will take the saved totals for each period, then if a shift is running
@@ -875,6 +880,8 @@
                 const keepShare = showAfterTax['pay-section'] ? 1 - taxRate / 100 : 1; // the share left after the tax % the user typed
                 document.getElementById('total-' + period).textContent = formatMoney(total * keepShare);
             });
+
+            renderDailySummary(); // the live timer calls this every second, so the summary moves too
         }
 
         // On TODAY: shows the big live counter (ticking in real time if clocked
@@ -1164,7 +1171,6 @@
         // ---------- INIT for this section ----------
         async function initWorkTracker() {
             document.getElementById('entry-date').value = todayStr();
-            document.getElementById('spending-date').value = todayStr();
 
             const job = getSelectedJob();
             document.getElementById('entry-rate-hint').textContent = job
@@ -1173,7 +1179,6 @@
 
             await loadDailyEntryForDate(todayStr());
             await loadDailySummaryForDate(todayStr());
-            await loadSpendingForDate(todayStr());
             await loadWeeklySnapshot();
             await loadMonthCompare();
             await loadYearTotals();
@@ -1342,6 +1347,8 @@
         });
 
         // ---------- DAILY SUMMARY ----------
+        // first it will get the saved wage and commission for the date, and remember them.
+        // then it will show them, and the live timer keeps adding the running shift on top
         async function loadDailySummaryForDate(dateStr) {
             const refDate = parseLocalDate(dateStr);
             const nextDay = new Date(refDate);
@@ -1349,11 +1356,9 @@
 
             const wagePay = await computeShiftsPay(refDate, nextDay);
             const commissionPay = await computeCommissions(refDate, nextDay);
-            const total = wagePay + commissionPay;
 
-            document.getElementById('summary-hourly-pay').textContent = formatMoney(wagePay);
-            document.getElementById('summary-commission-pay').textContent = formatMoney(commissionPay);
-            document.getElementById('summary-total-daily').textContent = formatMoney(total);
+            summaryBase = { wagePay: wagePay, commissionPay: commissionPay, start: refDate, end: nextDay };
+            renderDailySummary();
 
             // 5-star rate from daily_metrics for this date
             const { data } = await supabaseClient
@@ -1369,6 +1374,26 @@
             document.getElementById('summary-star-rate').textContent = rate.toFixed(2) + '%';
         }
 
+        // shows the saved wage and commission, plus what the running shift has earned so far
+        // if that shift started on the summary's date
+        function renderDailySummary()
+        {
+            if (!summaryBase) return;
+
+            let wagePay = summaryBase.wagePay;
+
+            if (activeShift) {
+                const clockIn = new Date(activeShift.clock_in);
+                if (clockIn >= summaryBase.start && clockIn < summaryBase.end) {
+                    wagePay += liveShiftWage;
+                }
+            }
+
+            document.getElementById('summary-hourly-pay').textContent = formatMoney(wagePay);
+            document.getElementById('summary-commission-pay').textContent = formatMoney(summaryBase.commissionPay);
+            document.getElementById('summary-total-daily').textContent = formatMoney(wagePay + summaryBase.commissionPay);
+        }
+
         // ---------- WEEKLY SNAPSHOT ----------
         async function loadWeeklySnapshot() {
             const today = parseLocalDate(todayStr());
@@ -1378,47 +1403,6 @@
             const wagePay = await computeShiftsPay(weekStart, tomorrow);
             const commissionPay = await computeCommissions(weekStart, tomorrow);
             document.getElementById('snapshot-week-earnings').textContent = formatMoney(wagePay + commissionPay);
-        }
-
-        // ---------- DAILY SPENDING ----------
-        document.getElementById('spending-date').addEventListener('change', () => {
-            loadSpendingForDate(document.getElementById('spending-date').value || todayStr());
-        });
-
-        document.getElementById('save-spending-btn').addEventListener('click', async () => {
-            const statusEl = document.getElementById('spending-status');
-            const dateStr = document.getElementById('spending-date').value || todayStr();
-            const amount = parseFloat(document.getElementById('spending-amount').value);
-
-            if (isNaN(amount) || amount <= 0) {
-                statusEl.textContent = 'Enter a valid amount.';
-                return;
-            }
-
-            const { error } = await supabaseClient
-                .from('daily_spending')
-                .insert([{ user_id: currentUser.userId, entry_date: dateStr, amount: amount }]);
-
-            if (error) {
-                statusEl.textContent = 'Error: ' + error.message;
-                return;
-            }
-
-            statusEl.textContent = 'Spending saved!';
-            statusEl.style.color = '#0f766e';
-            document.getElementById('spending-amount').value = '';
-            await loadSpendingForDate(dateStr);
-        });
-
-        async function loadSpendingForDate(dateStr) {
-            const { data } = await supabaseClient
-                .from('daily_spending')
-                .select('amount')
-                .eq('user_id', currentUser.userId)
-                .eq('entry_date', dateStr);
-
-            const total = (data || []).reduce((sum, s) => sum + parseFloat(s.amount), 0);
-            document.getElementById('spending-selected-day').textContent = formatMoney(total);
         }
 
         // ---------- MONTH TOTALS (COMPARE) ----------
