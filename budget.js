@@ -9,6 +9,9 @@
         let activeShift = null; // { id, job_id, clock_in }
         let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
         let liveTimerInterval = null;
+        let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
+        let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
+        let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let avgLookupCache = {};        // job_title(lowercase) -> average_wage, fetched once
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
@@ -328,6 +331,7 @@
             clearInterval(liveTimerInterval);
             const clockedOutJob = getSelectedJob();
             activeShift = null;
+            liveShiftWage = 0;
             document.getElementById('clock-in').disabled = false;
             document.getElementById('clock-out').disabled = true;
             document.getElementById('start-lunch-btn').disabled = true;
@@ -579,6 +583,9 @@
                 const regularMinutes = Math.max(0, Math.min(elapsedMinutes, OVERTIME_WEEKLY_THRESHOLD_MINUTES - minutesBeforeThisShift));
                 const overtimeMinutes = elapsedMinutes - regularMinutes;
                 const wagePay = (regularMinutes * minuteWage) + (overtimeMinutes * minuteWage * OVERTIME_MULTIPLIER);
+
+                liveShiftWage = wagePay; // lets the Day / Week / Month / Year totals follow the running shift
+                renderTotals();
 
                 const commissionSoFar = job ? (todaysCommissionByJob[String(job.id)] || 0) : 0;
                 const pay = wagePay + commissionSoFar; // live tracker = minute wage (worked out) + commission
@@ -848,9 +855,9 @@
 
                 const shiftsPay = await computeShiftsPay(start, end);
                 const commissionPay = await computeCommissions(start, end);
-                const total = calculateTax(shiftsPay + commissionPay, 'pay-section');
-
-                document.getElementById('total-' + period).textContent = formatMoney(total);
+                // remember the before-tax total, so the live timer can add the running shift on top of it
+                totalsBase[period] = shiftsPay + commissionPay;
+                totalsRanges[period] = { start: start, end: end };
 
                 if (period === 'day') {
                     dayWagePay = shiftsPay;
@@ -858,11 +865,36 @@
                 }
             }
 
+            renderTotals();
+
             // both the big number AND the breakdown line follow whichever date
             // is selected in the "Viewing:" picker — if that date is today AND
             // there's an active shift, the live timer keeps controlling the
             // number instead (handled inside this function)
             updateEarningsBox(refDate, dayWagePay, dayCommissionPay);
+        }
+
+        // first it will take the saved totals for each period, then if a shift is running
+        // right now it will add what that shift has earned so far to every period it falls
+        // inside, and finally it will apply the tax toggle and show the numbers.
+        // the live timer calls this every second, so the totals move while you work
+        function renderTotals() {
+            const periods = ['day', 'week', 'month', 'year'];
+            periods.forEach(period => {
+                if (totalsBase[period] === undefined) return;
+
+                let total = totalsBase[period];
+
+                if (activeShift) {
+                    const clockIn = new Date(activeShift.clock_in);
+                    const range = totalsRanges[period];
+                    if (clockIn >= range.start && clockIn < range.end) {
+                        total += liveShiftWage;
+                    }
+                }
+
+                document.getElementById('total-' + period).textContent = formatMoney(calculateTax(total, 'pay-section'));
+            });
         }
 
         // On TODAY: shows the big live counter (ticking in real time if clocked
