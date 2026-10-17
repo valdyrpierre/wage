@@ -120,7 +120,7 @@ async function loadJobs() {
 async function loadShifts() {
     const { data, error } = await supabaseClient
         .from('shifts')
-        .select('*, jobs(job_title, hourly_wage)')
+        .select('*, jobs(job_title, hourly_wage, company)')
         .eq('user_id', currentUser.id)
         .order('clock_in', { ascending: false });
 
