@@ -42,6 +42,7 @@ function addListener(id, eventName, handler)
         let liveTimerInterval = null;
         let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
         let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
+        let minutesBeforeThisShift = 0; // minutes already worked this week at the same company, before the running shift started
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
         let summaryBase = null; // the Daily Summary's saved wage + commission for its date, plus the date range, so the live timer can add the running shift on top
@@ -623,17 +624,76 @@ function addListener(id, eventName, handler)
             }, 0);
         }
 
+        // checks the database for the running shift, because it can be changed somewhere else
+        // (the Shifts page, another tab, another device). it handles three cases:
+        // - the shift was deleted or clocked out: we stop the live counter
+        // - the clock-in time was edited: we use the new time and recalculate
+        // - nothing changed: we do nothing
+        async function syncActiveShiftWithDatabase() {
+            if (!activeShift) return;
+
+            const { data, error } = await supabaseClient
+                .from('shifts')
+                .select('*')
+                .eq('id', activeShift.id)
+                .maybeSingle();
+
+            if (error) return; // can't reach the database right now, so keep what we have
+
+            if (!data || data.clock_out) {
+                clearInterval(liveTimerInterval);
+                activeShift = null;
+                activeBreak = null;
+                liveShiftWage = 0;
+                document.getElementById('clock-in').disabled = false;
+                document.getElementById('clock-out').disabled = true;
+                document.getElementById('start-lunch-btn').disabled = true;
+                setLunchButtonsState(false);
+                document.getElementById('lunch-status').textContent = '';
+                document.getElementById('clock-status').textContent = 'Not clocked in';
+                document.getElementById('clock-status').classList.remove('active');
+                await refreshTotals();
+                return;
+            }
+
+            if (new Date(data.clock_in).getTime() !== new Date(activeShift.clock_in).getTime()) {
+                activeShift = data;
+                const job = getSelectedJob();
+                minutesBeforeThisShift = job
+                    ? (await getWeeklyHoursBeforeShift(job, new Date(data.clock_in))) * 60
+                    : 0;
+                document.getElementById('clock-status').textContent = 'Clocked in since ' + new Date(data.clock_in).toLocaleTimeString();
+                await refreshTotals();
+            }
+        }
+
+        // when the user comes back to this tab (for example after editing the shift on the Shifts page) we check right away
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                syncActiveShiftWithDatabase();
+            }
+        });
+
         async function startLiveTimer() {
             const job = getSelectedJob();
             const wage = job ? parseFloat(job.hourly_wage) : 0;
             const minuteWage = wage / 60; // pay rate per minute, the basis for the live tracker
 
-            // minutes already worked this week (other completed shifts, same job) before this one started
-            const minutesBeforeThisShift = job
+            // minutes already worked this week (other completed shifts, same company) before this one started
+            minutesBeforeThisShift = job
                 ? (await getWeeklyHoursBeforeShift(job, new Date(activeShift.clock_in))) * 60
                 : 0;
 
+            let tickCount = 0;
             liveTimerInterval = setInterval(async () => {
+                // every 15 seconds we ask the database if this shift was changed on another page
+                // (for example the clock-in time edited on the Shifts page) and pick up the change
+                tickCount++;
+                if (tickCount % 15 === 0) {
+                    await syncActiveShiftWithDatabase();
+                }
+                if (!activeShift) return; // the sync found the shift was clocked out or deleted
+
                 const now = new Date();
                 const clockInTime = new Date(activeShift.clock_in);
 
@@ -647,6 +707,11 @@ function addListener(id, eventName, handler)
                 const breakMs = getBreakMsSoFar(breaksForShift || []);
                 const rawElapsedMinutes = (now - clockInTime) / (1000 * 60);
                 const elapsedMinutes = Math.max(0, rawElapsedMinutes - (breakMs / (1000 * 60))); // lunch time doesn't count toward pay
+
+                // a clock-in time that is still in the future can't earn anything yet, so we say why the counter is at $0.00
+                if (rawElapsedMinutes < 0) {
+                    document.getElementById('clock-status').textContent = 'Clock-in time is in the future. Fix it on the Shifts page.';
+                }
 
                 // live tracker = minute wage × minutes worked, with the overtime
                 // bump applied to whichever minutes push the week past 40 hours
