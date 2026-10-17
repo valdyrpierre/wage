@@ -88,7 +88,7 @@ async function computeIncomeThisMonth() {
 
     const { data: shifts } = await supabaseClient
         .from('shifts')
-        .select('id, job_id, clock_in, clock_out, jobs(hourly_wage)') // jobs(hourly_wage) pulls in the linked job's wage; id needed to look up breaks
+        .select('id, job_id, clock_in, clock_out, jobs(hourly_wage, company)') // jobs(hourly_wage, company) pulls in the linked job's wage; id needed to look up breaks
         .eq('user_id', currentUser.id)
         .not('clock_out', 'is', null) // only count shifts that have actually been clocked out of
         .gte('clock_in', fetchFrom.toISOString())
@@ -213,7 +213,7 @@ async function loadJobsForEditing() {
     userJobs.forEach(job => {
         const opt = document.createElement('option');
         opt.value = job.id;           // the actual value submitted/read from the dropdown
-        opt.textContent = job.job_title; // what the user sees in the dropdown
+        opt.textContent = job.company ? job.company + ' — ' + job.job_title : job.job_title; // what the user sees in the dropdown
         select.appendChild(opt);
     });
 
@@ -230,6 +230,7 @@ async function loadJobsForEditing() {
 
 // Fills the "Edit Jobs" form fields with a specific job's current values.
 function fillJobEditForm(job) {
+    document.getElementById('edit-job-company').value = job.company || '';
     document.getElementById('edit-job-title').value = job.job_title;
     document.getElementById('edit-job-wage').value = job.hourly_wage;
 }
@@ -246,9 +247,16 @@ document.getElementById('job-edit-form').addEventListener('submit', async (e) =>
         return;
     }
 
+    const newCompany = document.getElementById('edit-job-company').value.trim();
     const newTitle = document.getElementById('edit-job-title').value.trim();
     const newWage = parseFloat(document.getElementById('edit-job-wage').value);
     const MAX_REASONABLE_WAGE = 1000;
+
+    if (!newCompany) {
+        statusEl.textContent = 'Company cannot be empty. Overtime is counted separately for each company.';
+        statusEl.style.color = '#dc2626';
+        return;
+    }
 
     if (!newTitle) {
         statusEl.textContent = 'Job title cannot be empty.';
@@ -270,7 +278,7 @@ document.getElementById('job-edit-form').addEventListener('submit', async (e) =>
 
     const { error } = await supabaseClient
         .from('jobs')
-        .update({ job_title: newTitle, hourly_wage: newWage })
+        .update({ company: newCompany, job_title: newTitle, hourly_wage: newWage })
         .eq('id', jobId); // only update the one row matching this job's id
 
     if (error) {
