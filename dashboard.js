@@ -6,6 +6,7 @@
         let currentUser = null;
         let userJob = null;
         let userJobs = []; // every job the user has (one per company)
+        let shiftsErrorShown = false; // so the "could not load shifts" pop up only shows once, not every second
         let selectedJobId = null;
         let activeShift = null; // { id, job_id, clock_in }
         let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
@@ -851,7 +852,15 @@
                 .gte('clock_in', fetchFrom.toISOString())
                 .lt('clock_in', endDate.toISOString());
 
-            if (error || !shifts) return 0;
+            if (error || !shifts) {
+                // before this, a failed load quietly showed $0.00 everywhere. now the user is told why, once
+                console.error('Could not load shifts:', error);
+                if (!shiftsErrorShown) {
+                    shiftsErrorShown = true;
+                    alert('Could not load your shifts: ' + (error ? error.message : 'unknown error') + '\n\nIf this mentions "company", run jobs-add-company.sql in Supabase first.');
+                }
+                return 0;
+            }
 
             const breaksByShiftId = await fetchBreaksByShiftId(shifts.map(s => s.id));
             const shiftPayMap = computeShiftPayWithOvertime(shifts, breaksByShiftId);
