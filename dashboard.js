@@ -853,9 +853,9 @@
             // number instead (handled inside this function)
             updateEarningsBox(refDate, dayWagePay, dayCommissionPay);
 
-            // the Daily Summary shows the date picked in the Daily Entry form (today to start).
+            // the Daily Summary shows the same date as the "Viewing:" picker (today to start).
             // clock out, commission and break changes all come through here, so it stays up to date
-            await loadDailySummaryForDate(document.getElementById('entry-date').value || todayStr());
+            await loadDailySummaryForDate(document.getElementById('view-date').value || todayStr());
         }
 
         // first it will take the saved totals for each period, then if a shift is running
@@ -1153,198 +1153,24 @@
         // ============================================================
         // Design notes:
         // - phones_repaired / insurance_signups / total_customers /
-        //   five_star_reviews / notes are stored in a new "daily_metrics"
-        //   table — pure business metrics, NOT pay. They don't duplicate
-        //   anything that already exists.
-        // - The $5/repair + $35/signup commission this form calculates gets
-        //   saved into the EXISTING "commissions" table (upserted per day),
-        //   so it feeds the same totals as everywhere else in the app rather
-        //   than being a disconnected number.
-        // - "Hours Worked" on this form creates/updates a manual shift in the
-        //   EXISTING "shifts" table (same mechanism as "Add a Shift" on the
-        //   Shifts page), so it runs through the real overtime calculation
-        //   instead of being a separate fake hours figure.
+        //   five_star_reviews are stored in the "daily_metrics" table. there is
+        //   no Daily Entry form on this page anymore, so nothing adds to that
+        //   table from here. the Month Totals and the 5-Star Rate only read it.
+        // - the $5 per repair and $35 per signup rates below are still used by
+        //   the Save Goal Planner to show how many repairs or signups are needed.
 
         const PHONE_REPAIR_RATE = 5;
         const INSURANCE_SIGNUP_RATE = 35;
 
         // ---------- INIT for this section ----------
         async function initWorkTracker() {
-            document.getElementById('entry-date').value = todayStr();
-
-            const job = getSelectedJob();
-            document.getElementById('entry-rate-hint').textContent = job
-                ? `Hourly pay rate for ${job.job_title}: $${parseFloat(job.hourly_wage).toFixed(2)}/hr`
-                : 'Add a job in User Info to see your hourly rate.';
-
-            await loadDailyEntryForDate(todayStr());
-            await loadDailySummaryForDate(todayStr());
+            // the Daily Summary is already filled in by refreshTotals(), so we start at the weekly snapshot
             await loadWeeklySnapshot();
             await loadMonthCompare();
             await loadYearTotals();
             await loadSaveGoalPlanner();
             await renderTwelveMonthChart();
         }
-
-        // ---------- DAILY ENTRY FORM (phones, signups, customers, reviews, notes) ----------
-
-        // Pre-fills the form with whatever's already saved for a given date, if anything.
-        async function loadDailyEntryForDate(dateStr) {
-            if (!selectedJobId) return;
-
-            const { data, error } = await supabaseClient
-                .from('daily_metrics')
-                .select('*')
-                .eq('user_id', currentUser.userId)
-                .eq('job_id', selectedJobId)
-                .eq('entry_date', dateStr)
-                .maybeSingle();
-
-            if (error || !data) {
-                document.getElementById('entry-phones').value = '';
-                document.getElementById('entry-signups').value = '';
-                document.getElementById('entry-customers').value = '';
-                document.getElementById('entry-reviews').value = '';
-                document.getElementById('entry-notes').value = '';
-                return;
-            }
-
-            document.getElementById('entry-phones').value = data.phones_repaired || '';
-            document.getElementById('entry-signups').value = data.insurance_signups || '';
-            document.getElementById('entry-customers').value = data.total_customers || '';
-            document.getElementById('entry-reviews').value = data.five_star_reviews || '';
-            document.getElementById('entry-notes').value = data.notes || '';
-        }
-
-        document.getElementById('entry-date').addEventListener('change', async () => {
-            const dateStr = document.getElementById('entry-date').value || todayStr();
-            await loadDailyEntryForDate(dateStr);
-            await loadDailySummaryForDate(dateStr);
-        });
-
-        document.getElementById('clear-entry-btn').addEventListener('click', () => {
-            document.getElementById('entry-hours').value = '';
-            document.getElementById('entry-phones').value = '';
-            document.getElementById('entry-signups').value = '';
-            document.getElementById('entry-customers').value = '';
-            document.getElementById('entry-reviews').value = '';
-            document.getElementById('entry-notes').value = '';
-            document.getElementById('daily-entry-status').textContent = '';
-        });
-
-        document.getElementById('daily-entry-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const statusEl = document.getElementById('daily-entry-status');
-            statusEl.textContent = '';
-
-            if (!selectedJobId) {
-                statusEl.textContent = 'Add a job in User Info before saving a daily entry.';
-                return;
-            }
-
-            const dateStr = document.getElementById('entry-date').value;
-            const hours = parseFloat(document.getElementById('entry-hours').value) || 0;
-            const phones = parseInt(document.getElementById('entry-phones').value, 10) || 0;
-            const signups = parseInt(document.getElementById('entry-signups').value, 10) || 0;
-            const customers = parseInt(document.getElementById('entry-customers').value, 10) || 0;
-            const reviews = parseInt(document.getElementById('entry-reviews').value, 10) || 0;
-            const notes = document.getElementById('entry-notes').value.trim();
-
-            switch (true) {
-                case !dateStr:
-                    statusEl.textContent = 'Please choose a date.';
-                    return;
-                case reviews > customers && customers > 0:
-                    statusEl.textContent = '5-star reviews can\'t exceed total customers.';
-                    return;
-            }
-
-            // 1) Upsert the business metrics (phones/signups/customers/reviews/notes)
-            const { error: metricsError } = await supabaseClient
-                .from('daily_metrics')
-                .upsert([{
-                    user_id: currentUser.userId,
-                    job_id: selectedJobId,
-                    entry_date: dateStr,
-                    phones_repaired: phones,
-                    insurance_signups: signups,
-                    total_customers: customers,
-                    five_star_reviews: reviews,
-                    notes: notes || null,
-                    updated_at: new Date().toISOString()
-                }], { onConflict: 'user_id,job_id,entry_date' });
-
-            if (metricsError) {
-                statusEl.textContent = 'Error saving daily metrics: ' + metricsError.message;
-                return;
-            }
-
-            // 2) Auto-calculate commission from phones + signups and save it into
-            // the existing commissions table (replacing any prior commission this
-            // form saved for the same day, so re-saving doesn't double it up)
-            const commissionAmount = (phones * PHONE_REPAIR_RATE) + (signups * INSURANCE_SIGNUP_RATE);
-
-            await supabaseClient
-                .from('commissions')
-                .delete()
-                .eq('user_id', currentUser.userId)
-                .eq('job_id', selectedJobId)
-                .eq('entry_date', dateStr)
-                .eq('from_daily_tracker', true);
-
-            if (commissionAmount > 0) {
-                await supabaseClient
-                    .from('commissions')
-                    .insert([{
-                        user_id: currentUser.userId,
-                        job_id: selectedJobId,
-                        amount: commissionAmount,
-                        entry_date: dateStr,
-                        from_daily_tracker: true
-                    }]);
-            }
-
-            // 3) If hours were entered, create a manual shift for that day
-            // (same approach as "Add a Shift" on the Shifts page) — but only
-            // if one doesn't already exist for this date, to avoid piling up
-            // duplicate shifts every time the form is re-saved
-            if (hours > 0) {
-                const { data: existingShifts } = await supabaseClient
-                    .from('shifts')
-                    .select('id')
-                    .eq('user_id', currentUser.userId)
-                    .eq('job_id', selectedJobId)
-                    .gte('clock_in', dateStr + 'T00:00:00')
-                    .lt('clock_in', dateStr + 'T23:59:59')
-                    .not('clock_out', 'is', null);
-
-                if (!existingShifts || existingShifts.length === 0) {
-                    const clockIn = new Date(dateStr + 'T09:00:00');
-                    const clockOut = new Date(clockIn);
-                    clockOut.setMinutes(clockOut.getMinutes() + Math.round(hours * 60));
-
-                    await supabaseClient
-                        .from('shifts')
-                        .insert([{
-                            user_id: currentUser.userId,
-                            job_id: selectedJobId,
-                            clock_in: clockIn.toISOString(),
-                            clock_out: clockOut.toISOString()
-                        }]);
-                }
-            }
-
-            statusEl.textContent = 'Day saved!';
-            statusEl.style.color = '#0f766e';
-
-            await loadDailySummaryForDate(dateStr);
-            await loadWeeklySnapshot();
-            await loadMonthCompare();
-            await loadYearTotals();
-            await loadSaveGoalPlanner();
-            await renderTwelveMonthChart();
-            await refreshTotals();
-        });
 
         // ---------- DAILY SUMMARY ----------
         // first it will get the saved wage and commission for the date, and remember them.
