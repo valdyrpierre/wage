@@ -911,3 +911,46 @@ button:disabled {
     border-radius: 20px;
     transition: width 0.5s ease;
 }
+
+/* ---- edit job title (dashboard header) ---- */
+.edit-job-btn {
+    margin-top: 4px;
+    padding: 2px 12px;
+    font-size: 0.8rem;
+    border: 1px solid #0f766e;
+    background: transparent;
+    color: #0f766e;
+    border-radius: 999px;
+    cursor: pointer;
+}
+.edit-job-btn:hover { background: #f0fdfa; }
+.edit-job-form {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+.edit-job-form input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    min-width: 220px;
+}
+.edit-job-form button {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #0f766e;
+    background: #0f766e;
+    color: #fff;
+    cursor: pointer;
+}
+.edit-job-form #cancel-job-title-btn { background: transparent; color: #0f766e; }
+
+.job-select {
+    margin-top: 6px;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    max-width: 100%;
+}
