@@ -1,3 +1,32 @@
+// If anything breaks, show a red message at the top of the page. before this, a broken script
+// just left the page stuck on "Loading..." or on $0.00 and nothing explained why
+function showPageError(message)
+{
+    console.error('Dashboard error:', message);
+    let banner = document.getElementById('page-error-banner');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'page-error-banner';
+        banner.style.cssText = 'background:#fee2e2;color:#991b1b;padding:10px 16px;font-size:0.9rem;border-bottom:1px solid #fca5a5;';
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
+    banner.textContent = 'Dashboard error: ' + message + ' (if you just uploaded new files, make sure dashboard.html AND dashboard.js are both the newest versions, then press Ctrl+Shift+R)';
+}
+window.addEventListener('error', (e) => showPageError(e.message));
+window.addEventListener('unhandledrejection', (e) => showPageError(e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+
+// adds a listener only if the element is on the page, so one missing element
+// can't stop the whole script from loading
+function addListener(id, eventName, handler)
+{
+    const element = document.getElementById(id);
+    if (!element) {
+        console.warn('dashboard.js: no element with id "' + id + '" on this page, skipping it');
+        return;
+    }
+    element.addEventListener(eventName, handler);
+}
+
 // TODO: replace with your actual Supabase project values
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
@@ -152,21 +181,23 @@
         function showJobInHeader()
         {
             const select = document.getElementById('job-select');
-            select.innerHTML = '';
-            userJobs.forEach(job => {
-                const option = document.createElement('option');
-                option.value = job.id;
-                option.textContent = jobLabel(job);
-                select.appendChild(option);
-            });
-            select.value = userJob.id;
-            select.style.display = userJobs.length > 1 ? '' : 'none';
+            if (select) {
+                select.innerHTML = '';
+                userJobs.forEach(job => {
+                    const option = document.createElement('option');
+                    option.value = job.id;
+                    option.textContent = jobLabel(job);
+                    select.appendChild(option);
+                });
+                select.value = userJob.id;
+                select.style.display = userJobs.length > 1 ? '' : 'none';
+            }
 
             document.getElementById('job-title-display').textContent = jobLabel(userJob);
         }
 
         // when the user picks a different job, everything on the page switches to that job
-        document.getElementById('job-select').addEventListener('change', async () => {
+        addListener('job-select', 'change', async () => {
             const select = document.getElementById('job-select');
 
             // a shift that is running belongs to one company, so the user has to clock out before switching
@@ -1001,7 +1032,7 @@
 
         // ---------- TAX RATE BOX ----------
         // whenever the tax rate changes we update every number that can show after tax
-        document.getElementById('tax-rate').addEventListener('input', () => {
+        addListener('tax-rate', 'input', () => {
             const typedRate = parseFloat(document.getElementById('tax-rate').value);
 
             switch (true) {
@@ -1037,18 +1068,18 @@
         // ---------- EDIT JOB (company + title) ----------
         // the "Edit" button next to the job name opens a small form to change the company and the job title.
         // the hourly wage is changed on the Profile page
-        document.getElementById('edit-job-btn').addEventListener('click', () => {
+        addListener('edit-job-btn', 'click', () => {
             document.getElementById('edit-job-company-input').value = userJob ? (userJob.company || '') : '';
             document.getElementById('edit-job-title-input').value = userJob ? userJob.job_title : '';
             document.getElementById('edit-job-form').style.display = 'flex';
             document.getElementById('edit-job-status').textContent = '';
         });
 
-        document.getElementById('cancel-job-title-btn').addEventListener('click', () => {
+        addListener('cancel-job-title-btn', 'click', () => {
             document.getElementById('edit-job-form').style.display = 'none';
         });
 
-        document.getElementById('save-job-title-btn').addEventListener('click', async () => {
+        addListener('save-job-title-btn', 'click', async () => {
             const newCompany = document.getElementById('edit-job-company-input').value.trim();
             const newTitle = document.getElementById('edit-job-title-input').value.trim();
             const statusEl = document.getElementById('edit-job-status');
