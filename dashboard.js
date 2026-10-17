@@ -5,6 +5,7 @@
 
         let currentUser = null;
         let userJob = null;
+        let userJobs = []; // every job the user has (one per company)
         let selectedJobId = null;
         let activeShift = null; // { id, job_id, clock_in }
         let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
@@ -105,25 +106,25 @@
             if (!currentUser) return; // something was missing, the pop up already told the user
             document.getElementById('user-name').textContent = firstname + ' ' + lastname;
 
-            // second we ask the database for the user's job
+            // second we ask the database for ALL of the user's jobs (one for each company)
             const { data: jobs, error: jobsError } = await supabaseClient
                 .from('jobs')
                 .select('*')
                 .eq('user_id', currentUser.userId)
-                .order('created_at', { ascending: true })
-                .limit(1);
+                .order('created_at', { ascending: true });
 
             if (jobsError) {
-                return alert('Error loading your job: ' + jobsError.message);
+                return alert('Error loading your jobs: ' + jobsError.message);
             }
 
-            userJob = getUserEmploymentInfo(jobs[0]);
+            userJobs = jobs || [];
+            userJob = getUserEmploymentInfo(userJobs[0]); // we start on the first job, and the drop down lets the user switch
             if (!userJob) {
                 document.getElementById('job-title-display').textContent = 'No job info found';
                 return;
             }
             selectedJobId = userJob.id;
-            document.getElementById('job-title-display').textContent = userJob.job_title;
+            showJobInHeader();
 
             // third we load everything that needs the job
             await loadTodaysCommissions();
@@ -134,11 +135,55 @@
             await renderMonthlyChart();
         }
 
-        // there is only one job now, so this just hands back userJob
-        // (kept so the code that calls it reads the same as before)
+        // hands back the job that is currently selected at the top of the page
         function getSelectedJob() {
             return userJob;
         }
+
+        // the text for a job, like "Sonesta — Front Desk Associate". a job with no company just shows its title
+        function jobLabel(job)
+        {
+            return job.company ? job.company + ' — ' + job.job_title : job.job_title;
+        }
+
+        // first it will fill the drop down with every job, then it will show the selected job's name.
+        // the drop down only shows up when the user has more than one job
+        function showJobInHeader()
+        {
+            const select = document.getElementById('job-select');
+            select.innerHTML = '';
+            userJobs.forEach(job => {
+                const option = document.createElement('option');
+                option.value = job.id;
+                option.textContent = jobLabel(job);
+                select.appendChild(option);
+            });
+            select.value = userJob.id;
+            select.style.display = userJobs.length > 1 ? '' : 'none';
+
+            document.getElementById('job-title-display').textContent = jobLabel(userJob);
+        }
+
+        // when the user picks a different job, everything on the page switches to that job
+        document.getElementById('job-select').addEventListener('change', async () => {
+            const select = document.getElementById('job-select');
+
+            // a shift that is running belongs to one company, so the user has to clock out before switching
+            if (activeShift) {
+                alert('Please clock out before switching jobs.');
+                select.value = userJob.id;
+                return;
+            }
+
+            userJob = userJobs.find(j => String(j.id) === String(select.value));
+            selectedJobId = userJob.id;
+            showJobInHeader();
+
+            await loadTodaysCommissions();
+            await loadCommissionEntriesForDate(document.getElementById('commission-date').value || todayStr());
+            await loadTodaysBreaks();
+            await refreshTotals();
+        });
 
         // fetches today's commission entries and sums them per job_id
         async function loadTodaysCommissions() {
@@ -159,26 +204,30 @@
 
         // NOTE: getWeekStartDate now lives in shared.js
 
-        // sums completed hours worked this week for a given job, up to (not including) a cutoff time —
-        // used as the "baseline" so the live counter knows if it's already past the overtime threshold
-        async function getWeeklyHoursBeforeShift(jobId, cutoffDate) {
+        // sums completed hours worked this week at the same COMPANY as the given job, up to (not including) a cutoff time —
+        // used as the "baseline" so the live counter knows if it's already past the overtime threshold.
+        // hours at a different company are not counted, because overtime is per company
+        async function getWeeklyHoursBeforeShift(job, cutoffDate) {
             const weekStart = getWeekStartDate(cutoffDate);
 
             const { data, error } = await supabaseClient
                 .from('shifts')
-                .select('id, clock_in, clock_out')
+                .select('id, job_id, clock_in, clock_out, jobs(company)')
                 .eq('user_id', currentUser.userId)
-                .eq('job_id', jobId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', weekStart.toISOString())
                 .lt('clock_in', cutoffDate.toISOString());
 
             if (error || !data) return 0;
 
-            // take the lunch breaks out the same way the totals do, so the live counter and the totals agree
-            const breaksByShiftId = await fetchBreaksByShiftId(data.map(s => s.id));
+            // keep only the shifts that belong to the same company as this job
+            const employerKey = getEmployerKey(job.company, job.id);
+            const sameCompanyShifts = data.filter(s => getEmployerKey(s.jobs && s.jobs.company, s.job_id) === employerKey);
 
-            return data.reduce((sum, s) => {
+            // take the lunch breaks out the same way the totals do, so the live counter and the totals agree
+            const breaksByShiftId = await fetchBreaksByShiftId(sameCompanyShifts.map(s => s.id));
+
+            return sameCompanyShifts.reduce((sum, s) => {
                 const rawHours = (new Date(s.clock_out) - new Date(s.clock_in)) / (1000 * 60 * 60);
                 const breakHours = (breaksByShiftId.get(s.id) || []).reduce((breakSum, b) => {
                     if (!b.break_end) return breakSum; // a break that was never closed does not count
@@ -201,6 +250,13 @@
             if (!error && data && data.length > 0) {
                 activeShift = data[0];
                 selectedJobId = activeShift.job_id;
+
+                // if the running shift belongs to a different job than the one showing, switch to that job
+                const activeJob = userJobs.find(j => j.id === activeShift.job_id);
+                if (activeJob) {
+                    userJob = activeJob;
+                    showJobInHeader();
+                }
                 document.getElementById('clock-in').disabled = true;
                 document.getElementById('clock-out').disabled = false;
                 document.getElementById('start-lunch-btn').disabled = false;
@@ -542,7 +598,7 @@
 
             // minutes already worked this week (other completed shifts, same job) before this one started
             const minutesBeforeThisShift = job
-                ? (await getWeeklyHoursBeforeShift(job.id, new Date(activeShift.clock_in))) * 60
+                ? (await getWeeklyHoursBeforeShift(job, new Date(activeShift.clock_in))) * 60
                 : 0;
 
             liveTimerInterval = setInterval(async () => {
@@ -642,7 +698,7 @@
             const container = document.getElementById('commission-entries-list');
             const { data, error } = await supabaseClient
                 .from('commissions')
-                .select('id, amount, job_id, jobs(job_title)')
+                .select('id, amount, job_id, jobs(job_title, company)')
                 .eq('user_id', currentUser.userId)
                 .eq('entry_date', dateStr)
                 .order('id', { ascending: true });
@@ -672,7 +728,7 @@
         }
 
         function renderCommissionViewMode(row, entry) {
-            const jobTitle = entry.jobs ? entry.jobs.job_title : '(job removed)';
+            const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
                 <span class="commission-job">${jobTitle}</span>
                 <span class="commission-amount">${formatMoney(parseFloat(entry.amount))}</span>
@@ -686,7 +742,7 @@
         }
 
         function renderCommissionEditMode(row, entry) {
-            const jobTitle = entry.jobs ? entry.jobs.job_title : '(job removed)';
+            const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
                 <span class="commission-job">${jobTitle}</span>
                 <input type="number" class="edit-commission-amount" step="0.01" min="0.01" value="${entry.amount}">
@@ -789,7 +845,7 @@
 
             const { data: shifts, error } = await supabaseClient
                 .from('shifts')
-                .select('*, jobs(hourly_wage)')
+                .select('*, jobs(hourly_wage, company)')
                 .eq('user_id', currentUser.userId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', fetchFrom.toISOString())
@@ -969,9 +1025,11 @@
             });
         });
 
-        // ---------- EDIT JOB TITLE ----------
-        // the "Edit" button next to the job title opens a small form to type a new title
+        // ---------- EDIT JOB (company + title) ----------
+        // the "Edit" button next to the job name opens a small form to change the company and the job title.
+        // the hourly wage is changed on the Profile page
         document.getElementById('edit-job-btn').addEventListener('click', () => {
+            document.getElementById('edit-job-company-input').value = userJob ? (userJob.company || '') : '';
             document.getElementById('edit-job-title-input').value = userJob ? userJob.job_title : '';
             document.getElementById('edit-job-form').style.display = 'flex';
             document.getElementById('edit-job-status').textContent = '';
@@ -982,6 +1040,7 @@
         });
 
         document.getElementById('save-job-title-btn').addEventListener('click', async () => {
+            const newCompany = document.getElementById('edit-job-company-input').value.trim();
             const newTitle = document.getElementById('edit-job-title-input').value.trim();
             const statusEl = document.getElementById('edit-job-status');
 
@@ -990,19 +1049,23 @@
                     statusEl.textContent = 'Add a job in My Jobs first.';
                     statusEl.style.color = '#dc2626';
                     return;
+                case !newCompany:
+                    statusEl.textContent = 'Please enter the company. Overtime is counted separately for each company.';
+                    statusEl.style.color = '#dc2626';
+                    return;
                 case !newTitle:
                     statusEl.textContent = 'Please enter a job title.';
                     statusEl.style.color = '#dc2626';
                     return;
-                case newTitle.length > 100:
-                    statusEl.textContent = 'Job title is too long (max 100 characters).';
+                case newCompany.length > 100 || newTitle.length > 100:
+                    statusEl.textContent = 'Company and job title must each be 100 characters or less.';
                     statusEl.style.color = '#dc2626';
                     return;
             }
 
             const { error } = await supabaseClient
                 .from('jobs')
-                .update({ job_title: newTitle })
+                .update({ company: newCompany, job_title: newTitle })
                 .eq('id', userJob.id)
                 .eq('user_id', currentUser.userId);
 
@@ -1012,10 +1075,13 @@
                 return;
             }
 
-            // the database is updated, so now we update the page to match
+            // the database is updated, so now we update the page to match.
+            // a company change can move hours between overtime groups, so the totals are recalculated too
+            userJob.company = newCompany;
             userJob.job_title = newTitle;
-            document.getElementById('job-title-display').textContent = newTitle;
+            showJobInHeader();
             document.getElementById('edit-job-form').style.display = 'none';
+            await refreshTotals();
         });
 
         // ---------- MONTHLY INCOME CHART ----------
@@ -1043,7 +1109,7 @@
 
             const { data: shifts } = await supabaseClient
                 .from('shifts')
-                .select('id, job_id, clock_in, clock_out, jobs(hourly_wage)')
+                .select('id, job_id, clock_in, clock_out, jobs(hourly_wage, company)')
                 .eq('user_id', currentUser.userId)
                 .not('clock_out', 'is', null)
                 .gte('clock_in', earliest.toISOString());
