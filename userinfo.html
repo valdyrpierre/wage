@@ -27,13 +27,16 @@
     <main>
         <header>
             <h1>User Info</h1>
-            <p class="subtext">Tell us about your job(s) and hourly wage. Hours will be tracked separately via clock in/out.</p>
+            <p class="subtext">Tell us about your job(s), the company for each one, and your hourly wage. Hours will be tracked separately via clock in/out.</p>
         </header>
 
         <form id="userinfo-form">
             <div id="jobs-container">
                 <!-- job entry template (first job) -->
                 <div class="job-entry">
+                    <label for="company_0">Company:</label>
+                    <input type="text" class="company" id="company_0" name="company_0" autocomplete="off" placeholder="e.g. uBreakiFix, Sonesta" required>
+
                     <label for="job_title_0">Job Title:</label>
                     <div class="autocomplete-wrapper">
                         <input type="text" class="job_title" id="job_title_0" name="job_title_0" autocomplete="off" placeholder="Start typing e.g. Cashier..." required>
@@ -156,6 +159,9 @@
             const jobDiv = document.createElement('div');
             jobDiv.className = 'job-entry';
             jobDiv.innerHTML = `
+                <label for="company_${jobCount}">Company:</label>
+                <input type="text" class="company" id="company_${jobCount}" name="company_${jobCount}" autocomplete="off" placeholder="e.g. uBreakiFix, Sonesta" required>
+
                 <label for="job_title_${jobCount}">Job Title:</label>
                 <div class="autocomplete-wrapper">
                     <input type="text" class="job_title" id="job_title_${jobCount}" name="job_title_${jobCount}" autocomplete="off" placeholder="Start typing e.g. Cashier..." required>
@@ -191,6 +197,7 @@
 
             // collect all job title / wage pairs currently on the page
             const jobTitles = document.querySelectorAll('.job_title');
+            const jobCompanies = document.querySelectorAll('.company');
             const jobWages = document.querySelectorAll('.hourly_wage');
 
             // ---- validate every job entry before inserting anything ----
@@ -201,8 +208,14 @@
 
             for (let i = 0; i < jobTitles.length; i++) {
                 const title = jobTitles[i].value.trim();
+                const company = jobCompanies[i].value.trim();
                 const wage = parseFloat(jobWages[i].value);
                 const entryNumber = i + 1;
+
+                if (!company) {
+                    errorMsg.textContent = `Job #${entryNumber}: please enter the company. Overtime is counted separately for each company.`;
+                    return;
+                }
 
                 if (!title) {
                     errorMsg.textContent = `Job #${entryNumber}: please enter a job title.`;
@@ -224,6 +237,7 @@
             for (let i = 0; i < jobTitles.length; i++) {
                 jobsToInsert.push({
                     user_id: user.id,
+                    company: jobCompanies[i].value.trim(),
                     job_title: jobTitles[i].value.trim(),
                     hourly_wage: parseFloat(jobWages[i].value)
                 });
