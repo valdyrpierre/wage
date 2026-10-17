@@ -29,6 +29,16 @@ function formatMoney(n) {
 const OVERTIME_WEEKLY_THRESHOLD = 40; // hours per week before overtime kicks in
 const OVERTIME_MULTIPLIER = 1.5;      // "time and a half" pay rate for overtime hours
 
+// Overtime is counted per COMPANY, because hours at two different employers are never added together.
+// Two jobs with the same company name (ignoring capital letters and extra spaces) share one overtime pool.
+// A job with no company saved yet counts as its own company, so old jobs keep working.
+function getEmployerKey(company, jobId) {
+    if (company && company.trim()) {
+        return 'c:' + company.trim().toLowerCase();
+    }
+    return 'j:' + jobId;
+}
+
 // Given any Date, returns a new Date representing the Sunday that starts
 // that date's calendar week (time reset to midnight). Used to group shifts
 // into "weeks" — overtime resets every week, so we need to know which week
@@ -44,7 +54,7 @@ function getWeekStartDate(date) {
 // shift actually paid, accounting for overtime AND unpaid lunch breaks.
 //
 // Why overtime needs this treatment: it isn't based on one shift's length —
-// it's based on TOTAL hours across a whole week, for a single job. If you
+// it's based on TOTAL hours across a whole week, for a single company. If you
 // worked 35 hours earlier in the week and then work a 10-hour shift, only
 // the last 5 of those 10 hours count as overtime (35 + 5 = 40 regular, 5 OT).
 //
@@ -62,17 +72,17 @@ function computeShiftPayWithOvertime(shifts, breaksByShiftId) {
     breaksByShiftId = breaksByShiftId || new Map();
     const payByShift = new Map();
 
-    // Step 1: group shifts by "job + week" — overtime is tracked separately
-    // per job, per week (two different jobs don't share an overtime pool,
+    // Step 1: group shifts by "company + week" — overtime is tracked separately
+    // per company, per week (two different companies don't share an overtime pool,
     // and hours reset every new week).
     const groups = new Map();
     shifts.forEach(s => {
-        const weekKey = s.job_id + '_' + getWeekStartDate(new Date(s.clock_in)).getTime();
+        const weekKey = getEmployerKey(s.jobs && s.jobs.company, s.job_id) + '_' + getWeekStartDate(new Date(s.clock_in)).getTime();
         if (!groups.has(weekKey)) groups.set(weekKey, []);
         groups.get(weekKey).push(s);
     });
 
-    // Step 2: for each job+week group, walk through shifts in chronological
+    // Step 2: for each company+week group, walk through shifts in chronological
     // order, keeping a running total of hours worked so far that week.
     // Whatever pushes the running total past 40 hours gets paid at the
     // overtime rate instead of the regular rate.
