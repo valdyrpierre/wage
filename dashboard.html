@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="dashboard-styles.css">
+    <link rel="stylesheet" href="dashboard-styles.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
@@ -136,39 +136,6 @@
             </div>
         </section>
 
-        <section class="daily-entry-section">
-            <h2>Daily Entry</h2>
-            <form id="daily-entry-form">
-                <label for="entry-date">Date:</label>
-                <input type="date" id="entry-date" required>
-
-                <label for="entry-hours">Hours Worked:</label>
-                <input type="number" id="entry-hours" step="0.25" min="0" max="24" placeholder="0">
-
-                <label for="entry-phones">Phones Repaired ($5 each):</label>
-                <input type="number" id="entry-phones" step="1" min="0" placeholder="0">
-
-                <label for="entry-signups">Insurance Signups ($35 each):</label>
-                <input type="number" id="entry-signups" step="1" min="0" placeholder="0">
-
-                <label for="entry-customers">Total Customers:</label>
-                <input type="number" id="entry-customers" step="1" min="0" placeholder="0">
-
-                <label for="entry-reviews">5-Star Reviews:</label>
-                <input type="number" id="entry-reviews" step="1" min="0" placeholder="0">
-
-                <label for="entry-notes">Daily Notes:</label>
-                <textarea id="entry-notes" rows="2" placeholder="Optional notes about the day"></textarea>
-
-                <div class="daily-entry-buttons">
-                    <input type="submit" value="Save / Update Day">
-                    <button type="button" id="clear-entry-btn">Clear Inputs</button>
-                </div>
-                <p id="daily-entry-status" class="form-status"></p>
-                <p class="hint" id="entry-rate-hint">Hourly pay rate: —</p>
-            </form>
-        </section>
-
         <section class="daily-summary-section">
             <h2>Daily Summary</h2>
             <div class="summary-grid-4">
@@ -259,15 +226,9 @@
             </div>
         </section>
 
-        <section class="twelve-month-section">
-            <h2>Last 12 Months</h2>
-            <p class="disclaimer">Compares monthly money and 5-star rate for the last 12 months.</p>
-            <canvas id="twelve-month-chart" height="240"></canvas>
-        </section>
-
     </main>
 
-    <script src="shared.js?v=14"></script>
-    <script src="dashboard.js?v=14"></script>
+    <script src="shared.js?v=15"></script>
+    <script src="dashboard.js?v=15"></script>
 </body>
 </html>
