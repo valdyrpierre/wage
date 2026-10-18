@@ -42,6 +42,7 @@ function addListener(id, eventName, handler)
         let liveTimerInterval = null;
         let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
         let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
+        let todayBase = null; // what the user already earned TODAY from finished shifts and commission, across ALL jobs (null when viewing another date)
         let minutesBeforeThisShift = 0; // minutes already worked this week at the same company, before the running shift started
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
@@ -177,46 +178,144 @@ function addListener(id, eventName, handler)
             return job.company ? job.company + ' — ' + job.job_title : job.job_title;
         }
 
-        // first it will fill the drop down with every job, then it will show the selected job's name.
-        // the drop down only shows up when the user has more than one job
+        // shows the selected job's name at the top, and fills the list of all the user's jobs.
+        // the list opens when the user clicks on the job name
         function showJobInHeader()
         {
-            const select = document.getElementById('job-select');
-            if (select) {
-                select.innerHTML = '';
-                userJobs.forEach(job => {
-                    const option = document.createElement('option');
-                    option.value = job.id;
-                    option.textContent = jobLabel(job);
-                    select.appendChild(option);
-                });
-                select.value = userJob.id;
-                select.style.display = userJobs.length > 1 ? '' : 'none';
-            }
-
-            document.getElementById('job-title-display').textContent = jobLabel(userJob);
+            const display = document.getElementById('job-title-display');
+            display.textContent = userJob ? jobLabel(userJob) : 'No job info found';
+            display.classList.toggle('clickable-job', userJobs.length > 0);
+            renderJobsPanel();
         }
 
-        // when the user picks a different job, everything on the page switches to that job
-        addListener('job-select', 'change', async () => {
-            const select = document.getElementById('job-select');
+        // clicking the job name opens or closes the list of all the user's jobs
+        addListener('job-title-display', 'click', () => {
+            const panel = document.getElementById('jobs-panel');
+            if (!panel || userJobs.length === 0) return;
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
 
-            // a shift that is running belongs to one company, so the user has to clock out before switching
-            if (activeShift) {
-                alert('Please clock out before switching jobs.');
-                select.value = userJob.id;
-                return;
-            }
+        // builds the list: one row for each job, with a Switch and a Delete button, and a link to add another job
+        function renderJobsPanel()
+        {
+            const panel = document.getElementById('jobs-panel');
+            if (!panel) return;
 
-            userJob = userJobs.find(j => String(j.id) === String(select.value));
-            selectedJobId = userJob.id;
-            showJobInHeader();
+            panel.innerHTML = '';
 
+            userJobs.forEach(job => {
+                const row = document.createElement('div');
+                row.className = 'jobs-panel-row';
+
+                const isCurrent = userJob && job.id === userJob.id;
+
+                const name = document.createElement('span');
+                name.className = 'jobs-panel-name';
+                name.textContent = jobLabel(job) + ' — $' + parseFloat(job.hourly_wage).toFixed(2) + '/hr';
+                row.appendChild(name);
+
+                const actions = document.createElement('span');
+                actions.className = 'jobs-panel-actions';
+
+                if (isCurrent) {
+                    const currentTag = document.createElement('span');
+                    currentTag.className = 'jobs-panel-current';
+                    currentTag.textContent = '● selected';
+                    actions.appendChild(currentTag);
+                } else {
+                    const switchBtn = document.createElement('button');
+                    switchBtn.type = 'button';
+                    switchBtn.textContent = 'Switch';
+                    switchBtn.addEventListener('click', () => switchToJob(job.id));
+                    actions.appendChild(switchBtn);
+                }
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'jobs-panel-delete';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.addEventListener('click', () => deleteJob(job));
+                actions.appendChild(deleteBtn);
+
+                row.appendChild(actions);
+                panel.appendChild(row);
+            });
+
+            const addLink = document.createElement('a');
+            addLink.href = 'userinfo.html';
+            addLink.className = 'jobs-panel-add';
+            addLink.textContent = '+ Add another job';
+            panel.appendChild(addLink);
+        }
+
+        // reloads everything on the page that depends on which job is selected
+        async function reloadJobData()
+        {
             await loadTodaysCommissions();
             await loadCommissionEntriesForDate(document.getElementById('commission-date').value || todayStr());
             await loadTodaysBreaks();
             await refreshTotals();
-        });
+            await renderMonthlyChart();
+            await loadWeeklySnapshot();
+            await loadMonthCompare();
+            await loadYearTotals();
+            await loadSaveGoalPlanner();
+            await renderTwelveMonthChart();
+        }
+
+        // switches the whole page to a different job
+        async function switchToJob(jobId)
+        {
+            // a shift that is running belongs to one company, so the user has to clock out before switching
+            if (activeShift) {
+                return alert('Please clock out before switching jobs.');
+            }
+
+            userJob = userJobs.find(j => String(j.id) === String(jobId));
+            selectedJobId = userJob.id;
+            showJobInHeader();
+            await reloadJobData();
+        }
+
+        // deletes a job after asking. the database also removes everything logged under that job
+        async function deleteJob(job)
+        {
+            // the running shift belongs to this job, so it has to be clocked out first
+            if (activeShift && activeShift.job_id === job.id) {
+                return alert('Please clock out before deleting this job.');
+            }
+
+            const confirmed = confirm('Delete "' + jobLabel(job) + '"?\n\nThis also deletes every shift, lunch break and commission logged under this job, and it changes your totals. This cannot be undone.');
+            if (!confirmed) return;
+
+            const { error } = await supabaseClient
+                .from('jobs')
+                .delete()
+                .eq('id', job.id)
+                .eq('user_id', currentUser.userId);
+
+            if (error) {
+                return alert('Error deleting the job: ' + error.message);
+            }
+
+            userJobs = userJobs.filter(j => j.id !== job.id);
+
+            // if the deleted job was the selected one, we move to the next job in the list (if there is one)
+            if (userJob && userJob.id === job.id) {
+                userJob = userJobs[0] || null;
+                selectedJobId = userJob ? userJob.id : null;
+            }
+
+            showJobInHeader();
+
+            if (userJobs.length === 0) {
+                const jobsPanel = document.getElementById('jobs-panel');
+                if (jobsPanel) jobsPanel.style.display = 'none';
+                alert('You have no jobs left. Add one on the My Jobs page to keep tracking your pay.');
+            }
+
+            await reloadJobData();
+        }
 
         // fetches today's commission entries and sums them per job_id
         async function loadTodaysCommissions() {
@@ -724,8 +823,17 @@ function addListener(id, eventName, handler)
                 liveShiftWage = wagePay; // lets the Day / Week / Month / Year totals follow the running shift
                 renderTotals();
 
-                const commissionSoFar = job ? (todaysCommissionByJob[String(job.id)] || 0) : 0;
-                const pay = wagePay + commissionSoFar; // live tracker = minute wage (worked out) + commission
+                // live tracker = everything already earned today at every job (finished shifts + all commission)
+                // + what the running shift has earned so far
+                const earnedBeforeWage = todayBase ? todayBase.wage : 0;
+                const earnedBeforeCommission = todayBase ? todayBase.commission : 0;
+                const pay = earnedBeforeWage + wagePay + earnedBeforeCommission;
+
+                // the small line under the big number follows along too
+                const breakdownLine = document.getElementById('day-breakdown');
+                if (todayBase && breakdownLine) {
+                    breakdownLine.textContent = `Wages: ${formatMoney(earnedBeforeWage + wagePay)} • Commission: ${formatMoney(earnedBeforeCommission)}`;
+                }
 
                 const payDisplay = document.getElementById('live-pay');
                 // if the user chose "Show After Tax" we keep (100 - tax%) of the pay, otherwise we keep all of it
@@ -1005,6 +1113,12 @@ function addListener(id, eventName, handler)
                     dayCommissionPay = commissionPay;
                 }
             }
+
+            // remember today's finished wage and commission from ALL jobs, so the live counter can add the running shift on top.
+            // this is what makes a day with two companies add up as one day
+            todayBase = (document.getElementById('view-date').value || todayStr()) === todayStr()
+                ? { wage: dayWagePay, commission: dayCommissionPay }
+                : null;
 
             renderTotals();
 
