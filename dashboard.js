@@ -260,7 +260,6 @@ function addListener(id, eventName, handler)
             await loadMonthCompare();
             await loadYearTotals();
             await loadSaveGoalPlanner();
-            await renderTwelveMonthChart();
         }
 
         // switches the whole page to a different job
@@ -1454,7 +1453,6 @@ function addListener(id, eventName, handler)
             await loadMonthCompare();
             await loadYearTotals();
             await loadSaveGoalPlanner();
-            await renderTwelveMonthChart();
         }
 
         // ---------- DAILY SUMMARY ----------
@@ -1638,78 +1636,6 @@ function addListener(id, eventName, handler)
             document.getElementById('goal-hours-needed').textContent = wage > 0 ? (needed / wage).toFixed(2) : '—';
             document.getElementById('goal-repairs-needed').textContent = Math.ceil(needed / PHONE_REPAIR_RATE);
             document.getElementById('goal-signups-needed').textContent = Math.ceil(needed / INSURANCE_SIGNUP_RATE);
-        }
-
-        // ---------- LAST 12 MONTHS CHART (money + 5-star rate) ----------
-        let twelveMonthChart = null;
-
-        async function renderTwelveMonthChart() {
-            const labels = [];
-            const moneyData = [];
-            const starRateData = [];
-
-            for (let i = 11; i >= 0; i--) {
-                const { start, end, label } = getMonthRange(i);
-                labels.push(label);
-
-                const wagePay = await computeShiftsPay(start, end);
-                const commissionPay = await computeCommissions(start, end);
-                moneyData.push(wagePay + commissionPay);
-
-                const { data } = await supabaseClient
-                    .from('daily_metrics')
-                    .select('total_customers, five_star_reviews')
-                    .eq('user_id', currentUser.userId)
-                    .gte('entry_date', start.toISOString().split('T')[0])
-                    .lt('entry_date', end.toISOString().split('T')[0]);
-
-                const customers = (data || []).reduce((sum, d) => sum + (d.total_customers || 0), 0);
-                const reviews = (data || []).reduce((sum, d) => sum + (d.five_star_reviews || 0), 0);
-                starRateData.push(customers > 0 ? (reviews / customers) * 100 : 0);
-            }
-
-            const ctx = document.getElementById('twelve-month-chart');
-
-            if (twelveMonthChart) {
-                twelveMonthChart.data.labels = labels;
-                twelveMonthChart.data.datasets[0].data = moneyData;
-                twelveMonthChart.data.datasets[1].data = starRateData;
-                twelveMonthChart.update();
-                return;
-            }
-
-            twelveMonthChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Money',
-                            data: moneyData,
-                            backgroundColor: '#0f766e',
-                            yAxisID: 'y'
-                        },
-                        {
-                            type: 'line',
-                            label: '5-Star Rate (%)',
-                            data: starRateData,
-                            borderColor: '#f59e0b',
-                            backgroundColor: '#f59e0b',
-                            yAxisID: 'y1',
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: { position: 'left', ticks: { callback: (val) => '$' + val } },
-                        y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { callback: (val) => val + '%' } }
-                    },
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
         }
 
         // initWorkTracker depends on selectedJobId being set by init() first,
