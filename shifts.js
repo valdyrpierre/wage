@@ -32,8 +32,11 @@ let usingFallbackAnchor = true;
 // Given any Date, returns the start (midnight) of the 14-day pay period
 // that date falls into, based on the current PERIOD_ANCHOR.
 function getPayPeriodStart(date) {
+    // we count whole calendar days (not milliseconds), so the clock change in March and November
+    // can never push a shift near midnight into the wrong pay period
     const msPerDay = 1000 * 60 * 60 * 24;
-    const daysSinceAnchor = Math.floor((date - PERIOD_ANCHOR) / msPerDay);
+    const dayNumber = d => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / msPerDay;
+    const daysSinceAnchor = dayNumber(date) - dayNumber(PERIOD_ANCHOR);
     // integer-divide by 14, then floor, to correctly handle dates before the anchor too
     const periodsSinceAnchor = Math.floor(daysSinceAnchor / 14);
     const periodStart = new Date(PERIOD_ANCHOR);
@@ -69,6 +72,7 @@ async function init() {
     }
 
     renderAnchorHint();
+    renderPeriodInfo();
     await loadJobs();
     await loadShifts();
 }
@@ -88,6 +92,28 @@ function renderAnchorHint() {
         hint.innerHTML = 'Pay periods below use a placeholder start date. Set your real <a href="myprofile.html">Pay Period Start Date in Profile</a> to line these up with your actual paychecks.';
         section.insertBefore(hint, section.querySelector('#periods-list'));
     }
+}
+
+// Shows one line above the shift list with the pay period schedule the app is using right now,
+// and the current pay period, so it is easy to see if it matches the real pay schedule
+function renderPeriodInfo() {
+    const section = document.querySelector('.shift-periods-section');
+    const existing = document.getElementById('period-info');
+    if (existing) existing.remove();
+
+    const currentStart = getPayPeriodStart(new Date());
+    const currentEnd = new Date(currentStart);
+    currentEnd.setDate(currentEnd.getDate() + 14);
+
+    const weekday = PERIOD_ANCHOR.toLocaleDateString(undefined, { weekday: 'long' });
+    const anchorText = PERIOD_ANCHOR.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const info = document.createElement('p');
+    info.id = 'period-info';
+    info.className = 'anchor-hint';
+    info.textContent = 'Pay periods start every other ' + weekday + ' (counting from ' + anchorText + '). '
+        + 'Current pay period: ' + formatDateRange(currentStart, currentEnd) + '.';
+    section.insertBefore(info, section.querySelector('#periods-list'));
 }
 
 async function loadJobs() {
