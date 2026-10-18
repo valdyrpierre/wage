@@ -954,3 +954,38 @@ button:disabled {
     font-size: 0.9rem;
     max-width: 100%;
 }
+
+/* ---- job list (click on the job name) ---- */
+.clickable-job { cursor: pointer; }
+.clickable-job::after { content: " ▾"; font-size: 0.8em; }
+.clickable-job:hover { text-decoration: underline; }
+.jobs-panel {
+    margin-top: 8px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    max-width: 520px;
+    color: #0f172a;
+}
+.jobs-panel-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #e2e8f0;
+}
+.jobs-panel-name { font-size: 0.9rem; }
+.jobs-panel-actions { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.jobs-panel-actions button {
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid #0f766e;
+    background: transparent;
+    color: #0f766e;
+    cursor: pointer;
+}
+.jobs-panel-actions .jobs-panel-delete { border-color: #dc2626; color: #dc2626; }
+.jobs-panel-current { color: #0f766e; font-size: 0.8rem; }
+.jobs-panel-add { display: inline-block; margin-top: 8px; font-size: 0.9rem; color: #0f766e; }
