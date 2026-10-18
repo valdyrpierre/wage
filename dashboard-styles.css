@@ -989,3 +989,47 @@ button:disabled {
 .jobs-panel-actions .jobs-panel-delete { border-color: #dc2626; color: #dc2626; }
 .jobs-panel-current { color: #0f766e; font-size: 0.8rem; }
 .jobs-panel-add { display: inline-block; margin-top: 8px; font-size: 0.9rem; color: #0f766e; }
+
+/* ---------- TWO-COLUMN DASHBOARD LAYOUT (less scrolling) ---------- */
+/* on a wide screen the sections sit side by side, on a phone or narrow window they stack like before */
+
+main {
+    max-width: 1200px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+        "clock    earnings"
+        "comm     totals"
+        "chart    chart"
+        "snapshot daily"
+        "month    year"
+        "goal     goal";
+    align-items: start;
+}
+
+main > section { margin-top: 0; }
+
+.clock-section        { grid-area: clock; }
+.constantpay          { grid-area: earnings; }
+.commission-section   { grid-area: comm; }
+.pay-section          { grid-area: totals; }
+.income-monthly-graph { grid-area: chart; }
+.weekly-snapshot-section { grid-area: snapshot; }
+.daily-summary-section   { grid-area: daily; }
+.month-compare-section   { grid-area: month; }
+.year-totals-section     { grid-area: year; }
+.save-goal-section       { grid-area: goal; }
+
+/* the two boxes in the same row get the same height */
+.clock-section, .constantpay, .commission-section, .pay-section { align-self: stretch; }
+
+@media (max-width: 860px) {
+    main {
+        grid-template-columns: 1fr;
+        grid-template-areas: none;
+    }
+    main > section { grid-area: auto; }
+}
+
+/* Totals as a 2 x 2 block so the box next to Commission is not a tall column */
+.pay-section .pay-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.pay-section .pay-box { padding: 14px; }
