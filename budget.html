@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="budget-styles.css?v=3">
+    <link rel="stylesheet" href="budget-styles.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -24,28 +24,29 @@
         </div>
     </nav>
 
+    <header class="page-header">
+        <h1>Budget</h1>
+        <p class="subtext">Track your bills against what you've earned this month.</p>
+    </header>
+
     <main>
-        <header>
-            <h1>Budget</h1>
-            <p class="subtext">Track your bills against what you've earned this month.</p>
-        </header>
 
         <section class="budget-summary">
-            <h2>Budget Summary</h2>
+            <h2>This Month</h2>
             <div class="summary-grid">
-                <div class="summary-box">
-                    <span class="label">Earned This Month</span>
+                <div class="summary-box income-box">
+                    <span class="label">Earned</span>
                     <span class="value" id="summary-income">$0.00</span>
                 </div>
                 <div class="summary-box">
-                    <span class="label">Total Bills This Month</span>
+                    <span class="label">Bills Due</span>
                     <span class="value" id="summary-bills">$0.00</span>
                 </div>
                 <div class="summary-box">
-                    <span class="label">% of Bills Covered</span>
+                    <span class="label">Bills Covered</span>
                     <span class="value" id="summary-percent">0%</span>
                 </div>
-                <div class="summary-box">
+                <div class="summary-box left-box">
                     <span class="label">Left to Spend</span>
                     <span class="value" id="summary-left">$0.00</span>
                 </div>
@@ -53,11 +54,12 @@
             <div class="progress-bar-track">
                 <div class="progress-bar-fill" id="summary-progress-fill"></div>
             </div>
+            <p class="income-line" id="income-list">Loading...</p>
         </section>
 
-        <section class="income-section">
-            <h2>My Income</h2>
-            <p id="income-list">Loading...</p>
+        <section class="bill-schedules">
+            <h2>Bills by Month</h2>
+            <div id="bill-schedules-list">Loading...</div>
         </section>
 
         <section class="budget-section">
@@ -92,20 +94,10 @@
                     <p class="hint">Creates this bill on the same day each month, starting from the due date above. (Can't be combined with splitting.)</p>
                 </div>
 
-                <p id="bill-form-status" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
+                <p id="bill-form-status"></p>
 
                 <input type="submit" value="Add Bill">
             </form>
-        </section>
-
-        <section class="bill-schedules">
-            <h2>Bill Schedules</h2>
-            <div id="bill-schedules-list">Loading...</div>
-        </section>
-
-        <section class="bill-checklist">
-            <h2>Bill Checklist</h2>
-            <div id="bill-checklist-list">Loading...</div>
         </section>
 
         <footer>
@@ -114,7 +106,7 @@
     </main>
 
     <script src="shared.js"></script>
-    <script src="budget.js?v=3"></script>
+    <script src="budget.js?v=4"></script>
 </body>
 
 </html>
