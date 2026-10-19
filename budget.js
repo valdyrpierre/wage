@@ -1,504 +1,689 @@
-// ============================================================
-// SUPABASE SETUP
-// ============================================================
-// TODO: replace with your actual Supabase project values
-// (Project Settings > API in your Supabase dashboard)
 const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ============================================================
-// GLOBAL STATE
-// ============================================================
-let currentUser = null; // the logged-in user's Supabase auth object
-let allBills = [];      // every bill row belonging to this user, refreshed after every add/edit/delete
+        let currentUser = null;
+        let allBills = [];
+        const MAX_REASONABLE_AMOUNT = 1000000;
+        const SPLIT_GAP_DAYS = 14;
+        const DUE_SOON_DAYS = 5;
 
-// NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
-// getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
-// all now live in shared.js (loaded before this file), so this page's
-// "Earned This Month" figure always agrees with dashboard.js, myprofile.js,
-// and shifts.js — they all use the exact same functions now.
-
-// Returns today's date as a "YYYY-MM-DD" string, matching how Supabase
-// stores "date" type columns (like bills.due_date, commissions.entry_date).
-function todayStr() {
-    return new Date().toISOString().split('T')[0];
-}
-
-// Returns the whole number of days between two dates (dateA - dateB).
-// Used to figure out "3 days until due" / "2 days overdue" for the bill schedule.
-function daysBetween(dateA, dateB) {
-    const msPerDay = 1000 * 60 * 60 * 24;
-    return Math.round((dateA - dateB) / msPerDay);
-}
-
-// Checks whether a date string (e.g. a bill's due_date) falls in the same
-// calendar month/year as a reference Date. Used to filter "bills due this month".
-function isSameMonth(dateStr, refDate) {
-    const d = new Date(dateStr);
-    return d.getFullYear() === refDate.getFullYear() && d.getMonth() === refDate.getMonth();
-}
-
-// ============================================================
-// INIT — runs once when the page loads
-// ============================================================
-async function init() {
-    // Check if someone is actually logged in. If not, bounce them to the login page.
-    const { data: { user }, error } = await supabaseClient.auth.getUser();
-    if (error || !user) {
-        window.location.href = 'login.html';
-        return;
-    }
-    currentUser = user;
-
-    await loadIncomeThisMonth();
-    await loadBills();
-}
-
-// ============================================================
-// INCOME THIS MONTH
-// ============================================================
-// Calculates total income (wages + commission) for the current calendar month,
-// and writes it directly into the "My Income" and summary boxes on the page.
-// This mirrors the same wage + commission calculation used on the dashboard
-// and profile pages, so the numbers agree everywhere in the app.
-async function loadIncomeThisMonth() {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-    // We fetch starting from the Sunday that begins monthStart's week (not from
-    // monthStart itself). Why? If the 1st of the month falls mid-week, we still
-    // need that week's earlier shifts in order to correctly calculate whether
-    // later shifts in that same week hit the overtime threshold.
-    const fetchFrom = getWeekStartDate(monthStart);
-
-    const { data: shifts } = await supabaseClient
-        .from('shifts')
-        .select('id, job_id, clock_in, clock_out, jobs(hourly_wage, company)') // jobs(hourly_wage, company) pulls in the linked job's wage; id needed to look up breaks
-        .eq('user_id', currentUser.id)
-        .not('clock_out', 'is', null) // only count shifts that have actually been clocked out of
-        .gte('clock_in', fetchFrom.toISOString())
-        .lt('clock_in', monthEnd.toISOString());
-
-    // Fetch any logged lunch breaks for these shifts (unpaid, so they get
-    // subtracted from each shift's hours), then run every shift through the
-    // overtime calculator so each shift's pay reflects whether it pushed the
-    // user over 40 hrs/week for its job.
-    const breaksByShiftId = await fetchBreaksByShiftId((shifts || []).map(s => s.id));
-    const shiftPayMap = computeShiftPayWithOvertime(shifts || [], breaksByShiftId);
-
-    // Now sum up ONLY the shifts that actually fall within this calendar month
-    // (we fetched a few extra "before the month started" shifts above purely
-    // to get the overtime math right — we don't want to count their pay here).
-    let wageTotal = 0;
-    (shifts || []).forEach(s => {
-        const clockIn = new Date(s.clock_in);
-        if (clockIn >= monthStart && clockIn < monthEnd) {
-            wageTotal += shiftPayMap.get(s) || 0;
-        }
-    });
-
-    // Add up any commission entries logged this month.
-    const { data: commissions } = await supabaseClient
-        .from('commissions')
-        .select('amount, entry_date')
-        .eq('user_id', currentUser.id)
-        .gte('entry_date', monthStart.toISOString().split('T')[0])
-        .lt('entry_date', monthEnd.toISOString().split('T')[0]);
-
-    const commissionTotal = (commissions || []).reduce((sum, c) => sum + parseFloat(c.amount), 0);
-
-    const incomeThisMonth = wageTotal + commissionTotal;
-
-    // Update the page directly with the results.
-    document.getElementById('summary-income').textContent = formatMoney(incomeThisMonth);
-    document.getElementById('income-list').textContent =
-        `Wages: ${formatMoney(wageTotal)}  •  Commission: ${formatMoney(commissionTotal)}`;
-
-    // Also return the number, since renderSummary() below needs it for its
-    // "% of bills covered" and "left to spend" calculations.
-    return incomeThisMonth;
-}
-
-// ============================================================
-// LOAD + RENDER BILLS
-// ============================================================
-// Fetches every bill belonging to the user, then re-renders all three
-// bill-related sections (schedule, checklist, summary) from that fresh data.
-async function loadBills() {
-    const { data, error } = await supabaseClient
-        .from('bills')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('due_date', { ascending: true }); // soonest-due bills appear first
-
-    if (error) {
-        document.getElementById('bill-schedules-list').textContent = 'Could not load bills.';
-        document.getElementById('bill-checklist-list').textContent = 'Could not load bills.';
-        return;
-    }
-
-    allBills = data || [];
-    renderSchedules();
-    renderChecklist();
-    await renderSummary();
-}
-
-// Renders the "Bill Schedules" section — one row per bill, color-coded by
-// urgency (overdue / due soon / paid / normal) based on today's date.
-function renderSchedules() {
-    const container = document.getElementById('bill-schedules-list');
-    container.innerHTML = ''; // clear out the old rows before rebuilding
-
-    if (allBills.length === 0) {
-        container.textContent = 'No bills added yet.';
-        return;
-    }
-
-    const today = new Date();
-
-    allBills.forEach(bill => {
-        const dueDate = new Date(bill.due_date);
-        const daysUntil = daysBetween(dueDate, today);
-
-        const row = document.createElement('div');
-        row.className = 'bill-row';
-
-        // Add a CSS class depending on the bill's status, so the stylesheet
-        // can color-code it (green = paid, amber = due soon, red = overdue).
-        if (bill.paid) {
-            row.classList.add('paid');
-        } else if (daysUntil < 0) {
-            row.classList.add('overdue');
-        } else if (daysUntil <= 5) {
-            row.classList.add('due-soon');
+        // Converts between a "YYYY-MM-DD" string and a LOCAL Date, in both directions:
+        // - give it a string and it returns the Date (new Date('2026-10-23') would be read as UTC,
+        //   so in Massachusetts it would show up as Oct 22)
+        // - give it a Date and it returns the string (toISOString would give tomorrow's date
+        //   after about 8pm Eastern)
+        function localDate(value)
+        {
+            if (typeof value === 'string') {
+                const [year, month, day] = value.split('-').map(Number);
+                return new Date(year, month - 1, day);
+            }
+            return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
         }
 
-        // Build the human-readable status text shown on the right of each row.
-        let statusText;
-        if (bill.paid) {
-            statusText = 'Paid';
-        } else if (daysUntil < 0) {
-            statusText = Math.abs(daysUntil) + ' day(s) overdue';
-        } else if (daysUntil === 0) {
-            statusText = 'Due today';
-        } else {
-            statusText = 'Due in ' + daysUntil + ' day(s)';
+        // Whole number of calendar days between two dates (dateA - dateB).
+        // Both dates are cut down to midnight first so the time of day and the
+        // daylight saving change can never move the answer by one day.
+        function daysBetween(dateA, dateB)
+        {
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const dayA = Date.UTC(dateA.getFullYear(), dateA.getMonth(), dateA.getDate());
+            const dayB = Date.UTC(dateB.getFullYear(), dateB.getMonth(), dateB.getDate());
+            return Math.round((dayA - dayB) / msPerDay);
         }
 
-        // If this bill is one installment of a split bill, show which part
-        // it is (e.g. "Part 2 of 3") next to its name. If it's a recurring
-        // bill instead, show a small "Recurring" badge.
-        const labelPart = bill.split_label
-            ? ` (${bill.split_label})`
-            : (bill.is_recurring ? ' 🔁 Recurring' : '');
+        // True when a "YYYY-MM-DD" string falls in the same month and year as refDate.
+        function isSameMonth(dateStr, refDate)
+        {
+            const d = localDate(dateStr);
+            return d.getFullYear() === refDate.getFullYear() && d.getMonth() === refDate.getMonth();
+        }
 
-        row.innerHTML = `
-            <span class="bill-name">${bill.name}${labelPart}</span>
-            <span class="bill-amount">${formatMoney(parseFloat(bill.amount))}</span>
-            <span class="bill-due">${dueDate.toLocaleDateString()}</span>
-            <span class="bill-status">${statusText}</span>
-            <button type="button" class="delete-bill-btn" data-bill-id="${bill.id}">Delete</button>
-        `;
-        container.appendChild(row);
-    });
+        // Returns the date that is N months after dateStr, on the same day of the month.
+        // If that month is shorter, it is clamped to the last day (Jan 31 + 1 month = Feb 28).
+        function addMonthsClamped(dateStr, monthsToAdd)
+        {
+            const original = localDate(dateStr);
+            const targetMonthIndex = original.getMonth() + monthsToAdd;
 
-    // wire up every delete button now that they exist in the DOM
-    container.querySelectorAll('.delete-bill-btn').forEach(btn => {
-        btn.addEventListener('click', () => deleteBill(btn.getAttribute('data-bill-id')));
-    });
-}
+            // day 0 of the next month is the last day of the target month
+            const lastDayOfTargetMonth = new Date(original.getFullYear(), targetMonthIndex + 1, 0).getDate();
+            const clampedDay = Math.min(original.getDate(), lastDayOfTargetMonth);
 
-// Deletes a single bill. If that bill is part of a recurring series, asks
-// whether to delete just this one occurrence or every future occurrence
-// in the same series (identified by matching recurring_group).
-async function deleteBill(billId) {
-    const bill = allBills.find(b => String(b.id) === String(billId));
-    if (!bill) return;
+            return new Date(original.getFullYear(), targetMonthIndex, clampedDay);
+        }
 
-    const confirmed = confirm(`Delete "${bill.name}"?`);
-    if (!confirmed) return;
+        // Returns the first day of this month and the first day of next month.
+        function getThisMonthRange()
+        {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            return { start, end };
+        }
 
-    if (bill.is_recurring && bill.recurring_group) {
-        const deleteAllFuture = confirm(
-            'This bill repeats monthly. Click OK to delete this AND all future occurrences in the series, or Cancel to delete just this one.'
-        );
+    
+        // Checks who is logged in. If nobody is, it sends them to the login page.
+        // If a user is logged in, it fills the page with the info about the user:
+        // - income
+        // - bills
+        async function obtainCurrentUser()
+        {
+            const { data: { user }, error } = await supabaseClient.auth.getUser();
+            if (error || !user) {
+                window.location.href = 'login.html';
+                return false;
+            }
+            currentUser = { email: user.email, userId: user.id };
+            return fillUserInfo();
+        }
 
-        if (deleteAllFuture) {
-            // delete this occurrence and every future one in the same series
+        // Gets every finished shift that could count for this month. It starts from the Sunday
+        // of the week the month begins in, because those earlier shifts are needed to know if a
+        // later shift of the same week went over the 40 hour overtime limit.
+        async function obtainUserShifts(monthStart, monthEnd)
+        {
+            switch (true) {
+                case currentUser === null:
+                    console.error('No user is logged in.');
+                    return null;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('shifts')
+                .select('id, job_id, clock_in, clock_out, jobs(hourly_wage, company)')
+                .eq('user_id', currentUser.userId)
+                .not('clock_out', 'is', null)
+                .gte('clock_in', getWeekStartDate(monthStart).toISOString())
+                .lt('clock_in', monthEnd.toISOString());
+
+            // if we load a user but not the shifts let dev know
+            if (error) {
+                console.error('User is logged in but shifts are not loaded:', error);
+                return null;
+            }
+            return data || [];
+        }
+
+        // Adds up the pay of ONLY the shifts that clocked in during the month. The extra shifts
+        // from before the month were fetched just for the overtime math, so they are skipped here.
+        function sumWagesInMonth(shifts, shiftPayMap, monthStart, monthEnd)
+        {
+            let wageTotal = 0;
+
+            shifts.forEach(shift => {
+                const clockIn = new Date(shift.clock_in);
+                if (clockIn >= monthStart && clockIn < monthEnd) {
+                    wageTotal += shiftPayMap.get(shift) || 0;
+                }
+            });
+
+            return wageTotal;
+        }
+
+        // this will load the wages the user earned this month (overtime and unpaid lunch included)
+        async function obtainUserIncome(monthStart, monthEnd)
+        {
+            const shifts = await obtainUserShifts(monthStart, monthEnd);
+            if (shifts === null) return null;
+
+            const breaksByShiftId = await fetchBreaksByShiftId(shifts.map(s => s.id));
+            const shiftPayMap = computeShiftPayWithOvertime(shifts, breaksByShiftId);
+
+            return sumWagesInMonth(shifts, shiftPayMap, monthStart, monthEnd);
+        }
+
+        // this will load user income earned from commission for this month
+        async function obtainUserCommission(monthStart, monthEnd)
+        {
+            switch (true) {
+                case currentUser === null:
+                    console.error('No user is logged in.');
+                    return null;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('commissions')
+                .select('amount')
+                .eq('user_id', currentUser.userId)
+                .gte('entry_date', localDate(monthStart))
+                .lt('entry_date', localDate(monthEnd));
+
+            if (error) {
+                console.error('User is logged in but commission is not loaded:', error);
+                return null;
+            }
+            return (data || []).reduce((sum, c) => sum + parseFloat(c.amount), 0);
+        }
+
+        // this will load every bill of the user (soonest due first) and keep them in allBills
+        async function obtainUserBills()
+        {
+            switch (true) {
+                case currentUser === null:
+                    console.error('No user is logged in.');
+                    return null;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('bills')
+                .select('*')
+                .eq('user_id', currentUser.userId)
+                .order('due_date', { ascending: true });
+
+            if (error) {
+                console.error('User is logged in but bills are not loaded:', error);
+                return null;
+            }
+
+            allBills = data || [];
+            return allBills;
+        }
+
+        // this function is responsible for calling
+        // the function that gets the user's full monthly income (wages + commission)
+        // the function that gets the user's bills
+        // and then it draws every section of the page
+        async function fillUserInfo()
+        {
+            const { start, end } = getThisMonthRange();
+
+            const bills = await obtainUserBills();
+            const wageTotal = await obtainUserIncome(start, end);
+            const commissionTotal = await obtainUserCommission(start, end);
+
+            if (bills === null) {
+                document.getElementById('bill-schedules-list').textContent = 'Could not load bills.';
+                document.getElementById('bill-checklist-list').textContent = 'Could not load bills.';
+            } else {
+                renderSchedules();
+                renderChecklist();
+            }
+
+            // the income is only shown when BOTH numbers loaded, so the summary never shows a wrong total
+            if (wageTotal === null || commissionTotal === null) {
+                renderIncomeError();
+                renderSummary(null);
+                return true;
+            }
+
+            renderIncome(wageTotal, commissionTotal);
+            renderSummary(wageTotal + commissionTotal);
+            return true;
+        }
+
+    
+        async function addBill(bills)
+        {
+            const { error } = await supabaseClient
+                .from('bills')
+                .insert(bills);
+
+            return error;
+        }
+
+        // this section allows the user to delete a bill
+        async function deleteBill(billId)
+        {
+            const { error } = await supabaseClient
+                .from('bills')
+                .delete()
+                .eq('id', billId)
+                .eq('user_id', currentUser.userId);
+
+            return error;
+        }
+
+        // deletes a bill and every later bill of the same monthly series
+        async function deleteBillSeries(bill)
+        {
             const { error } = await supabaseClient
                 .from('bills')
                 .delete()
                 .eq('recurring_group', bill.recurring_group)
+                .eq('user_id', currentUser.userId)
                 .gte('due_date', bill.due_date);
 
-            if (error) {
-                alert('Error deleting bills: ' + error.message);
+            return error;
+        }
+
+        // this section allows the user to update a bill
+        async function updateBill(billId, updatedBill)
+        {
+            const { error } = await supabaseClient
+                .from('bills')
+                .update(updatedBill)
+                .eq('id', billId)
+                .eq('user_id', currentUser.userId);
+
+            return error;
+        }
+
+        
+        // Puts the wage and commission numbers in the "My Income" box.
+        function renderIncome(wageTotal, commissionTotal)
+        {
+            document.getElementById('summary-income').textContent = formatMoney(wageTotal + commissionTotal);
+            document.getElementById('income-list').textContent =
+                `Wages: ${formatMoney(wageTotal)}  •  Commission: ${formatMoney(commissionTotal)}`;
+        }
+
+        // Shows a message in the "My Income" box when the income could not be loaded.
+        function renderIncomeError()
+        {
+            document.getElementById('summary-income').textContent = '—';
+            document.getElementById('income-list').textContent = 'Could not load your income. Press F12 to see why.';
+        }
+
+        // Total of the bills that are due this month. A bill due next month should not
+        // count against this month's income.
+        function getTotalBillsThisMonth()
+        {
+            const now = new Date();
+            return allBills
+                .filter(bill => isSameMonth(bill.due_date, now))
+                .reduce((sum, bill) => sum + parseFloat(bill.amount), 0);
+        }
+
+        // Percent of this month's bills that the income covers (0 when there are no bills).
+        function calculatePercentCovered(income, totalBills)
+        {
+            if (totalBills <= 0) return 0;
+            return (income / totalBills) * 100;
+        }
+
+        // Fills the Budget Summary boxes and the progress bar. income is null when it
+        // could not be loaded, in that case only the bills total is shown.
+        function renderSummary(income)
+        {
+            const totalBills = getTotalBillsThisMonth();
+            document.getElementById('summary-bills').textContent = formatMoney(totalBills);
+
+            if (income === null) {
+                document.getElementById('summary-percent').textContent = '—';
+                document.getElementById('summary-left').textContent = '—';
                 return;
             }
-            await loadBills();
-            return;
+
+            const percentCovered = calculatePercentCovered(income, totalBills);
+            const leftToSpend = income - totalBills; // negative when the bills are more than the income
+
+            document.getElementById('summary-percent').textContent = percentCovered.toFixed(0) + '%';
+            document.getElementById('summary-left').textContent = formatMoney(leftToSpend);
+
+            // the bar cannot go past full, but the number above it can show more than 100%
+            const fill = document.getElementById('summary-progress-fill');
+            fill.style.width = Math.min(percentCovered, 100) + '%';
+            fill.classList.toggle('over', leftToSpend < 0);
         }
-    }
 
-    // default: just delete this single bill row
-    const { error } = await supabaseClient.from('bills').delete().eq('id', billId);
+    
+        // Returns the extra text after a bill name: "(Part 2 of 3)", or the recurring badge.
+        function getBillLabelPart(bill)
+        {
+            if (bill.split_label) return ` (${bill.split_label})`;
+            if (bill.is_recurring) return ' 🔁 Recurring';
+            return '';
+        }
 
-    if (error) {
-        alert('Error deleting bill: ' + error.message);
-        return;
-    }
-    await loadBills();
-}
+        // Works out how urgent a bill is. Returns the css class for the row and the status text.
+        function getBillStatus(bill)
+        {
+            const daysUntil = daysBetween(localDate(bill.due_date), new Date());
 
-// Renders the "Bill Checklist" section — one checkbox row per bill, so the
-// user can mark bills as paid/unpaid directly.
-function renderChecklist() {
-    const container = document.getElementById('bill-checklist-list');
-    container.innerHTML = '';
+            switch (true) {
+                case bill.paid:
+                    return { cssClass: 'paid', text: 'Paid' };
+                case daysUntil < 0:
+                    return { cssClass: 'overdue', text: Math.abs(daysUntil) + ' day(s) overdue' };
+                case daysUntil === 0:
+                    return { cssClass: 'due-soon', text: 'Due today' };
+                case daysUntil <= DUE_SOON_DAYS:
+                    return { cssClass: 'due-soon', text: 'Due in ' + daysUntil + ' day(s)' };
+                default:
+                    return { cssClass: '', text: 'Due in ' + daysUntil + ' day(s)' };
+            }
+        }
 
-    if (allBills.length === 0) {
-        container.textContent = 'No bills to check off yet.';
-        return;
-    }
+        // Builds one small <span> with the given class and text. (textContent, not innerHTML,
+        // so a bill name with symbols in it can never break the page.)
+        function buildSpan(className, text)
+        {
+            const span = document.createElement('span');
+            span.className = className;
+            span.textContent = text;
+            return span;
+        }
 
-    allBills.forEach(bill => {
-        const row = document.createElement('label'); // <label> so clicking the text also toggles the checkbox
-        row.className = 'checklist-row';
+        // Builds one button of a bill row (Edit or Delete).
+        function buildRowButton(className, text, onClick)
+        {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = className;
+            button.textContent = text;
+            button.addEventListener('click', onClick);
+            return button;
+        }
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = bill.paid;
-        // Whenever the checkbox is toggled, immediately save the change to Supabase.
-        checkbox.addEventListener('change', () => toggleBillPaid(bill.id, checkbox.checked));
+        // Builds the little box that holds the Edit and Delete buttons of a row.
+        function buildRowActions(bill)
+        {
+            const actions = document.createElement('span');
+            actions.className = 'bill-actions';
+            actions.appendChild(buildRowButton('edit-bill-btn', 'Edit', () => handleEditBill(bill.id)));
+            actions.appendChild(buildRowButton('delete-bill-btn', 'Delete', () => handleDeleteBill(bill.id)));
+            return actions;
+        }
 
-        const labelPart = bill.split_label ? ` (${bill.split_label})` : '';
-        const text = document.createElement('span');
-        text.textContent = `${bill.name}${labelPart} — ${formatMoney(parseFloat(bill.amount))} — due ${new Date(bill.due_date).toLocaleDateString()}`;
+        // Builds one full row of the Bill Schedules section.
+        function buildScheduleRow(bill)
+        {
+            const status = getBillStatus(bill);
 
-        row.appendChild(checkbox);
-        row.appendChild(text);
-        container.appendChild(row);
-    });
-}
+            const row = document.createElement('div');
+            row.className = 'bill-row';
+            if (status.cssClass) row.classList.add(status.cssClass);
 
-// Updates a single bill's "paid" status in the database, then reloads
-// everything so the schedule/checklist/summary all reflect the change.
-async function toggleBillPaid(billId, paidValue) {
-    const { error } = await supabaseClient
-        .from('bills')
-        .update({ paid: paidValue })
-        .eq('id', billId);
+            row.appendChild(buildSpan('bill-name', bill.name + getBillLabelPart(bill)));
+            row.appendChild(buildSpan('bill-amount', formatMoney(parseFloat(bill.amount))));
+            row.appendChild(buildSpan('bill-due', localDate(bill.due_date).toLocaleDateString()));
+            row.appendChild(buildSpan('bill-status', status.text));
+            row.appendChild(buildRowActions(bill));
 
-    if (error) {
-        alert('Could not update bill: ' + error.message);
-        return;
-    }
+            return row;
+        }
 
-    await loadBills();
-}
+        // Draws the Bill Schedules section, one row per bill.
+        function renderSchedules()
+        {
+            const container = document.getElementById('bill-schedules-list');
+            container.innerHTML = '';
 
-// ============================================================
-// BUDGET SUMMARY
-// ============================================================
-// Fills in the top "Budget Summary" section: income earned this month,
-// total bills due this month, what % of those bills are covered by what's
-// been earned so far, and how much is left over to spend.
-async function renderSummary() {
-    const now = new Date();
-    const incomeThisMonth = await loadIncomeThisMonth();
+            if (allBills.length === 0) {
+                container.textContent = 'No bills added yet.';
+                return;
+            }
 
-    // Only count bills whose due date falls in the current month —
-    // a bill due next month shouldn't count against this month's income.
-    const billsThisMonth = allBills.filter(b => isSameMonth(b.due_date, now));
-    const totalBills = billsThisMonth.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+            allBills.forEach(bill => container.appendChild(buildScheduleRow(bill)));
+        }
 
-    // Avoid a divide-by-zero if there are no bills this month.
-    const percentCovered = totalBills > 0 ? (incomeThisMonth / totalBills) * 100 : 0;
-    const leftToSpend = incomeThisMonth - totalBills; // can go negative if bills exceed income
+        // ============================================================
+        // BILL CHECKLIST
+        // ============================================================
 
-    document.getElementById('summary-bills').textContent = formatMoney(totalBills);
-    document.getElementById('summary-percent').textContent = percentCovered.toFixed(0) + '%';
-    document.getElementById('summary-left').textContent = formatMoney(leftToSpend);
+        // Builds one checkbox row. A <label> is used so clicking the text also ticks the box.
+        function buildChecklistRow(bill)
+        {
+            const row = document.createElement('label');
+            row.className = 'checklist-row';
 
-    // Update the visual progress bar. We cap the fill width at 100% (a bar
-    // can't visually go past full), but the number above it can still show
-    // percentages over 100%.
-    const fill = document.getElementById('summary-progress-fill');
-    const clampedPercent = Math.min(percentCovered, 100);
-    fill.style.width = clampedPercent + '%';
-    // Switch the bar to a red "over budget" color if bills exceed income.
-    fill.classList.toggle('over', leftToSpend < 0);
-}
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = bill.paid;
+            checkbox.addEventListener('change', () => handleTogglePaid(bill.id, checkbox.checked));
 
-// ============================================================
-// ADD BILL (with optional split into installments, or monthly recurrence)
-// ============================================================
+            const labelPart = bill.split_label ? ` (${bill.split_label})` : '';
+            const dueText = localDate(bill.due_date).toLocaleDateString();
+            const text = document.createElement('span');
+            text.textContent = `${bill.name}${labelPart} — ${formatMoney(parseFloat(bill.amount))} — due ${dueText}`;
 
-// Splitting and recurring don't make sense combined (splitting the SAME bill
-// into installments AND repeating it every month gets confusing fast), so we
-// keep them mutually exclusive: checking "Repeat monthly" disables the split
-// dropdown, and picking a split disables the recurring checkbox.
-const recurringCheckbox = document.getElementById('bill-recurring');
-const recurringMonthsWrap = document.getElementById('recurring-months-wrap');
-const splitSelect = document.getElementById('bill-split');
+            row.appendChild(checkbox);
+            row.appendChild(text);
+            return row;
+        }
 
-recurringCheckbox.addEventListener('change', () => {
-    const isChecked = recurringCheckbox.checked;
-    recurringMonthsWrap.style.display = isChecked ? 'block' : 'none';
-    splitSelect.disabled = isChecked;
-    if (isChecked) splitSelect.value = '1'; // reset split back to "Don't split"
-});
+        // Draws the Bill Checklist section.
+        function renderChecklist()
+        {
+            const container = document.getElementById('bill-checklist-list');
+            container.innerHTML = '';
 
-splitSelect.addEventListener('change', () => {
-    const isSplitting = splitSelect.value !== '1';
-    recurringCheckbox.disabled = isSplitting;
-    if (isSplitting) {
-        recurringCheckbox.checked = false;
-        recurringMonthsWrap.style.display = 'none';
-    }
-});
+            if (allBills.length === 0) {
+                container.textContent = 'No bills to check off yet.';
+                return;
+            }
 
-// Given a due date and how many months to add, returns a new due date on
-// the same day-of-month, N months later — clamped to the last valid day of
-// that month if needed (e.g. Jan 31 + 1 month becomes Feb 28, not Mar 3).
-function addMonthsClamped(dateStr, monthsToAdd) {
-    const original = new Date(dateStr);
-    const targetMonthIndex = original.getMonth() + monthsToAdd;
+            allBills.forEach(bill => container.appendChild(buildChecklistRow(bill)));
+        }
+        // Saves the paid / unpaid change of one bill, then refreshes the page.
+        async function handleTogglePaid(billId, paidValue)
+        {
+            const error = await updateBill(billId, { paid: paidValue });
+            if (error) return alert('Could not update bill: ' + error.message);
 
-    // creating a date with day=0 gives us the LAST day of the month before it,
-    // which tells us how many days the target month actually has
-    const lastDayOfTargetMonth = new Date(original.getFullYear(), targetMonthIndex + 1, 0).getDate();
-    const clampedDay = Math.min(original.getDate(), lastDayOfTargetMonth);
+            await fillUserInfo();
+        }
 
-    return new Date(original.getFullYear(), targetMonthIndex, clampedDay);
-}
+        // First it confirms, then, if the bill repeats every month, it asks if the whole
+        // series should go too. At the end it deletes and refreshes the page.
+        async function handleDeleteBill(billId)
+        {
+            const bill = allBills.find(b => String(b.id) === String(billId));
+            if (!bill) return;
 
-document.getElementById('add-bill-form').addEventListener('submit', async (e) => {
-    e.preventDefault(); // stop the browser's default "reload the page" form behavior
+            if (!confirm(`Delete "${bill.name}"?`)) return;
 
-    const statusEl = document.getElementById('bill-form-status');
-    statusEl.textContent = '';
+            let deleteWholeSeries = false;
+            if (bill.is_recurring && bill.recurring_group) {
+                deleteWholeSeries = confirm('This bill repeats monthly. Click OK to delete this AND all future occurrences in the series, or Cancel to delete just this one.');
+            }
 
-    const name = document.getElementById('bill-name').value.trim();
-    const amount = parseFloat(document.getElementById('bill-amount').value);
-    const dueDate = document.getElementById('bill-due-date').value;
-    const splitCount = parseInt(document.getElementById('bill-split').value, 10);
-    const isRecurring = document.getElementById('bill-recurring').checked;
-    const recurringMonths = parseInt(document.getElementById('bill-recurring-months').value, 10) || 12;
+            const error = deleteWholeSeries ? await deleteBillSeries(bill) : await deleteBill(billId);
+            if (error) return alert('Error deleting bill: ' + error.message);
 
-    // ---- validation before building/inserting any rows ----
-    const MAX_REASONABLE_AMOUNT = 1000000;
+            await fillUserInfo();
+        }
 
-    if (!name) {
-        statusEl.textContent = 'Please enter a bill name.';
-        return;
-    }
+        // Asks for the new name, amount and due date (the old values are filled in, so pressing
+        // Cancel on any question stops the edit). It checks them the same way as the Add form,
+        // then saves and refreshes the page.
+        async function handleEditBill(billId)
+        {
+            const bill = allBills.find(b => String(b.id) === String(billId));
+            if (!bill) return;
 
-    if (isNaN(amount) || amount <= 0) {
-        statusEl.textContent = 'Amount must be a number greater than 0.';
-        return;
-    }
+            const name = prompt('Bill name:', bill.name);
+            if (name === null) return;
+            const amount = prompt('Amount ($):', bill.amount);
+            if (amount === null) return;
+            const dueDate = prompt('Due date (YYYY-MM-DD):', bill.due_date);
+            if (dueDate === null) return;
 
-    if (amount > MAX_REASONABLE_AMOUNT) {
-        statusEl.textContent = 'That amount seems too high — please double-check it.';
-        return;
-    }
+            const updated = { name: name.trim(), amount: parseFloat(amount), dueDate: dueDate.trim(), isRecurring: false };
 
-    if (!dueDate) {
-        statusEl.textContent = 'Please choose a due date.';
-        return;
-    }
+            const problem = validateBillForm(updated) || validateDateText(updated.dueDate);
+            if (problem) return alert(problem);
 
-    if (isRecurring && (isNaN(recurringMonths) || recurringMonths < 1 || recurringMonths > 24)) {
-        statusEl.textContent = 'Recurring months must be between 1 and 24.';
-        return;
-    }
+            const error = await updateBill(billId, { name: updated.name, amount: updated.amount, due_date: updated.dueDate });
+            if (error) return alert('Error updating bill: ' + error.message);
 
-    let rowsToInsert = [];
+            await fillUserInfo();
+        }
 
-    if (isRecurring) {
-        // Recurring bill: generate one row per month for the requested number
-        // of months, all sharing a recurring_group id so they're recognized
-        // as the same series (used later for "delete all future occurrences").
-        const recurringGroup = crypto.randomUUID();
+        // ============================================================
+        // ADD BILL FORM
+        // ============================================================
 
-        for (let i = 0; i < recurringMonths; i++) {
-            const occurrenceDate = addMonthsClamped(dueDate, i);
+        // Reads every input of the Add a Bill form into one object.
+        function readBillForm()
+        {
+            return {
+                name: document.getElementById('bill-name').value.trim(),
+                amount: parseFloat(document.getElementById('bill-amount').value),
+                dueDate: document.getElementById('bill-due-date').value,
+                splitCount: parseInt(document.getElementById('bill-split').value, 10),
+                isRecurring: document.getElementById('bill-recurring').checked,
+                recurringMonths: parseInt(document.getElementById('bill-recurring-months').value, 10)
+            };
+        }
 
-            rowsToInsert.push({
-                user_id: currentUser.id,
-                name: name,
-                amount: amount, // recurring bills use the full amount each month (not divided, unlike splitting)
-                due_date: occurrenceDate.toISOString().split('T')[0],
+        // Checks the form. Returns the error message for the first problem it finds,
+        // or an empty string when everything is fine.
+        function validateBillForm(form)
+        {
+            switch (true) {
+                case !form.name:
+                    return 'Please enter a bill name.';
+                case isNaN(form.amount) || form.amount <= 0:
+                    return 'Amount must be a number greater than 0.';
+                case form.amount > MAX_REASONABLE_AMOUNT:
+                    return 'That amount seems too high — please double-check it.';
+                case !form.dueDate:
+                    return 'Please choose a due date.';
+                case form.isRecurring && (isNaN(form.recurringMonths) || form.recurringMonths < 1 || form.recurringMonths > 24):
+                    return 'Recurring months must be between 1 and 24.';
+                default:
+                    return '';
+            }
+        }
+
+        // Checks that typed date text (used by the Edit question) is a real "YYYY-MM-DD" date.
+        function validateDateText(dateStr)
+        {
+            const looksRight = /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+            const isRealDate = looksRight && localDate(localDate(dateStr)) === dateStr;
+            return isRealDate ? '' : 'Please type the date like 2026-10-23.';
+        }
+
+        // Builds the base row of a bill. The split and recurring options are added on top of it.
+        function buildBillRow(form, dueDate)
+        {
+            return {
+                user_id: currentUser.userId,
+                name: form.name,
+                amount: form.amount,
+                due_date: dueDate,
                 paid: false,
                 split_group: null,
                 split_label: null,
-                is_recurring: true,
-                recurring_group: recurringGroup
-            });
-        }
-    } else if (splitCount <= 1) {
-        // No split, not recurring — just one bill row as entered.
-        rowsToInsert.push({
-            user_id: currentUser.id,
-            name: name,
-            amount: amount,
-            due_date: dueDate,
-            paid: false,
-            split_group: null, // null means "not part of a split bill"
-            split_label: null,
-            is_recurring: false,
-            recurring_group: null
-        });
-    } else {
-        // Splitting into multiple installments. Each installment becomes its
-        // own row in the "bills" table, sharing a common split_group id so
-        // they can be recognized as belonging to the same original bill.
-        const splitGroup = crypto.randomUUID(); // generates a unique id to link the installments together
-        const splitAmount = Math.round((amount / splitCount) * 100) / 100; // round to the nearest cent
-        const baseDate = new Date(dueDate);
-
-        for (let i = 0; i < splitCount; i++) {
-            const installmentDate = new Date(baseDate);
-            installmentDate.setDate(installmentDate.getDate() + (i * 14)); // space installments 2 weeks apart
-
-            rowsToInsert.push({
-                user_id: currentUser.id,
-                name: name,
-                amount: splitAmount,
-                due_date: installmentDate.toISOString().split('T')[0],
-                paid: false,
-                split_group: splitGroup,
-                split_label: `Part ${i + 1} of ${splitCount}`, // e.g. "Part 1 of 3"
                 is_recurring: false,
                 recurring_group: null
-            });
+            };
         }
-    }
 
-    // Insert all the rows (whether it's 1 row, several split installments,
-    // or a dozen monthly recurring occurrences) in a single request.
-    const { error } = await supabaseClient.from('bills').insert(rowsToInsert);
+        // One row, exactly as entered.
+        function buildSingleRows(form)
+        {
+            return [buildBillRow(form, form.dueDate)];
+        }
 
-    if (error) {
-        statusEl.textContent = 'Error adding bill: ' + error.message;
-        return;
-    }
+        // One row per month, all with the same recurring_group so they are known as one series.
+        // Every month uses the full amount (it is not divided like a split).
+        function buildRecurringRows(form)
+        {
+            const recurringGroup = crypto.randomUUID();
+            const rows = [];
 
-    document.getElementById('add-bill-form').reset(); // clear the form for the next entry
-    document.getElementById('recurring-months-wrap').style.display = 'none'; // hide the recurring options again after reset
-    await loadBills(); // refresh everything so the new bill shows up immediately
-});
+            for (let i = 0; i < form.recurringMonths; i++) {
+                const row = buildBillRow(form, localDate(addMonthsClamped(form.dueDate, i)));
+                row.is_recurring = true;
+                row.recurring_group = recurringGroup;
+                rows.push(row);
+            }
+            return rows;
+        }
 
-// ============================================================
-// NAV LOGOUT
-// ============================================================
-document.getElementById('nav-logout-btn').addEventListener('click', async () => {
-    await supabaseClient.auth.signOut();
-    window.location.href = 'login.html';
-});
+        // One row per installment, all with the same split_group, spaced 2 weeks apart.
+        // The amount is divided by the number of payments and rounded to the cent.
+        function buildSplitRows(form)
+        {
+            const splitGroup = crypto.randomUUID();
+            const splitAmount = Math.round((form.amount / form.splitCount) * 100) / 100;
+            const baseDate = localDate(form.dueDate);
+            const rows = [];
 
-// Kick everything off once the script loads.
-init();
+            for (let i = 0; i < form.splitCount; i++) {
+                const installmentDate = new Date(baseDate);
+                installmentDate.setDate(installmentDate.getDate() + (i * SPLIT_GAP_DAYS));
+
+                const row = buildBillRow(form, localDate(installmentDate));
+                row.amount = splitAmount;
+                row.split_group = splitGroup;
+                row.split_label = `Part ${i + 1} of ${form.splitCount}`;
+                rows.push(row);
+            }
+            return rows;
+        }
+
+        // Picks which kind of rows to build: recurring, split, or a single bill.
+        function buildRowsToInsert(form)
+        {
+            switch (true) {
+                case form.isRecurring:
+                    return buildRecurringRows(form);
+                case form.splitCount > 1:
+                    return buildSplitRows(form);
+                default:
+                    return buildSingleRows(form);
+            }
+        }
+
+        // Clears the form after a bill was added and hides the recurring options again.
+        function resetBillForm()
+        {
+            document.getElementById('add-bill-form').reset();
+            document.getElementById('recurring-months-wrap').style.display = 'none';
+            document.getElementById('bill-split').disabled = false;
+            document.getElementById('bill-recurring').disabled = false;
+        }
+
+        // ============================================================
+        // PAGE EVENTS
+        // ============================================================
+
+        // Splitting and repeating monthly cannot be used together, so ticking "Repeat monthly"
+        // turns the split dropdown off, and choosing a split turns the checkbox off.
+        document.getElementById('bill-recurring').addEventListener('change', () => {
+            const isChecked = document.getElementById('bill-recurring').checked;
+            document.getElementById('recurring-months-wrap').style.display = isChecked ? 'block' : 'none';
+            document.getElementById('bill-split').disabled = isChecked;
+            if (isChecked) document.getElementById('bill-split').value = '1';
+        });
+
+        document.getElementById('bill-split').addEventListener('change', () => {
+            const isSplitting = document.getElementById('bill-split').value !== '1';
+            document.getElementById('bill-recurring').disabled = isSplitting;
+            if (isSplitting) {
+                document.getElementById('bill-recurring').checked = false;
+                document.getElementById('recurring-months-wrap').style.display = 'none';
+            }
+        });
+
+        // First it reads and checks the form, then it builds the rows, saves them all in one
+        // request and refreshes the page so the new bill shows up right away.
+        document.getElementById('add-bill-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const statusEl = document.getElementById('bill-form-status');
+            statusEl.textContent = '';
+
+            const form = readBillForm();
+            const problem = validateBillForm(form);
+            if (problem) {
+                statusEl.textContent = problem;
+                return;
+            }
+
+            const error = await addBill(buildRowsToInsert(form));
+            if (error) {
+                statusEl.textContent = 'Error adding bill: ' + error.message;
+                return;
+            }
+
+            resetBillForm();
+            await fillUserInfo();
+        });
+
+        document.getElementById('nav-logout-btn').addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        // Kick everything off once the script loads. If something breaks, the message is
+        // shown in the My Income box (and in the console) instead of the page staying on "Loading...".
+        obtainCurrentUser().catch(err => {
+            console.error('Budget page failed to load:', err);
+            document.getElementById('income-list').textContent = 'Error loading the budget page: ' + err.message;
+        });
