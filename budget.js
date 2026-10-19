@@ -8,6 +8,10 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SPLIT_GAP_DAYS = 14;
         const DUE_SOON_DAYS = 5;
 
+        // NOTE: formatMoney, getWeekStartDate, computeShiftPayWithOvertime and
+        // fetchBreaksByShiftId live in shared.js (loaded before this file), so the
+        // "Earned This Month" number here always agrees with the dashboard.
+
         // Converts between a "YYYY-MM-DD" string and a LOCAL Date, in both directions:
         // - give it a string and it returns the Date (new Date('2026-10-23') would be read as UTC,
         //   so in Massachusetts it would show up as Oct 22)
@@ -63,7 +67,10 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return { start, end };
         }
 
-    
+        // ============================================================
+        // USER + DATA (every obtain function returns the data, or null if it could not get it)
+        // ============================================================
+
         // Checks who is logged in. If nobody is, it sends them to the login page.
         // If a user is logged in, it fills the page with the info about the user:
         // - income
@@ -195,10 +202,8 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 
             if (bills === null) {
                 document.getElementById('bill-schedules-list').textContent = 'Could not load bills.';
-                document.getElementById('bill-checklist-list').textContent = 'Could not load bills.';
             } else {
                 renderSchedules();
-                renderChecklist();
             }
 
             // the income is only shown when BOTH numbers loaded, so the summary never shows a wrong total
@@ -213,7 +218,11 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return true;
         }
 
-    
+        // ============================================================
+        // ADD / DELETE / UPDATE BILLS (each one only talks to the database, then refreshes the page)
+        // ============================================================
+
+        // this section allows the user to add bills (one row, or several rows for a split or recurring bill)
         async function addBill(bills)
         {
             const { error } = await supabaseClient
@@ -260,7 +269,10 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return error;
         }
 
-        
+        // ============================================================
+        // INCOME + SUMMARY
+        // ============================================================
+
         // Puts the wage and commission numbers in the "My Income" box.
         function renderIncome(wageTotal, commissionTotal)
         {
@@ -318,12 +330,15 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             fill.classList.toggle('over', leftToSpend < 0);
         }
 
-    
-        // Returns the extra text after a bill name: "(Part 2 of 3)", or the recurring badge.
-        function getBillLabelPart(bill)
+        // ============================================================
+        // BILLS BY MONTH
+        // ============================================================
+
+        // Returns the extra text after a bill name: "Part 2 of 3", "Repeats monthly", or nothing.
+        function getBillTag(bill)
         {
-            if (bill.split_label) return ` (${bill.split_label})`;
-            if (bill.is_recurring) return ' 🔁 Recurring';
+            if (bill.split_label) return bill.split_label;
+            if (bill.is_recurring) return 'Repeats monthly';
             return '';
         }
 
@@ -346,107 +361,172 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             }
         }
 
-        // Builds one small <span> with the given class and text. (textContent, not innerHTML,
+        // Builds one small element with the given tag, class and text. (textContent, not innerHTML,
         // so a bill name with symbols in it can never break the page.)
-        function buildSpan(className, text)
+        function buildElement(tagName, className, text)
         {
-            const span = document.createElement('span');
-            span.className = className;
-            span.textContent = text;
-            return span;
+            const element = document.createElement(tagName);
+            element.className = className;
+            element.textContent = text;
+            return element;
         }
 
         // Builds one button of a bill row (Edit or Delete).
         function buildRowButton(className, text, onClick)
         {
-            const button = document.createElement('button');
+            const button = buildElement('button', className, text);
             button.type = 'button';
-            button.className = className;
-            button.textContent = text;
             button.addEventListener('click', onClick);
             return button;
+        }
+
+        // Builds the paid checkbox of a bill row. Ticking it saves right away.
+        function buildPaidCheckbox(bill)
+        {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'bill-check';
+            checkbox.checked = bill.paid;
+            checkbox.title = 'Mark as paid';
+            checkbox.addEventListener('change', () => handleTogglePaid(bill.id, checkbox.checked));
+            return checkbox;
+        }
+
+        // Builds the name of a bill, with its small tag (Part 2 of 3 / Repeats monthly) under it.
+        function buildBillTitle(bill)
+        {
+            const title = buildElement('span', 'bill-title', '');
+            title.appendChild(buildElement('span', 'bill-name', bill.name));
+
+            const tag = getBillTag(bill);
+            if (tag) title.appendChild(buildElement('span', 'bill-tag', tag));
+
+            return title;
         }
 
         // Builds the little box that holds the Edit and Delete buttons of a row.
         function buildRowActions(bill)
         {
-            const actions = document.createElement('span');
-            actions.className = 'bill-actions';
+            const actions = buildElement('span', 'bill-actions', '');
             actions.appendChild(buildRowButton('edit-bill-btn', 'Edit', () => handleEditBill(bill.id)));
             actions.appendChild(buildRowButton('delete-bill-btn', 'Delete', () => handleDeleteBill(bill.id)));
             return actions;
         }
 
-        // Builds one full row of the Bill Schedules section.
-        function buildScheduleRow(bill)
+        // Builds one full bill row: checkbox, name, due date, amount, status pill, buttons.
+        function buildBillRow(bill)
         {
             const status = getBillStatus(bill);
 
-            const row = document.createElement('div');
-            row.className = 'bill-row';
+            const row = buildElement('div', 'bill-row', '');
             if (status.cssClass) row.classList.add(status.cssClass);
 
-            row.appendChild(buildSpan('bill-name', bill.name + getBillLabelPart(bill)));
-            row.appendChild(buildSpan('bill-amount', formatMoney(parseFloat(bill.amount))));
-            row.appendChild(buildSpan('bill-due', localDate(bill.due_date).toLocaleDateString()));
-            row.appendChild(buildSpan('bill-status', status.text));
+            row.appendChild(buildPaidCheckbox(bill));
+            row.appendChild(buildBillTitle(bill));
+            row.appendChild(buildElement('span', 'bill-due', localDate(bill.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })));
+            row.appendChild(buildElement('span', 'bill-amount', formatMoney(parseFloat(bill.amount))));
+            row.appendChild(buildElement('span', 'bill-status ' + status.cssClass, status.text));
             row.appendChild(buildRowActions(bill));
 
             return row;
         }
 
-        // Draws the Bill Schedules section, one row per bill.
+        // Groups all the bills by month ("2026-10"). Returns the months in order, each with its bills.
+        function groupBillsByMonth()
+        {
+            const months = new Map();
+
+            allBills.forEach(bill => {
+                const key = bill.due_date.slice(0, 7);
+                if (!months.has(key)) months.set(key, []);
+                months.get(key).push(bill);
+            });
+
+            return [...months.keys()].sort().map(key => ({ key, bills: months.get(key) }));
+        }
+
+        // "2026-10" -> "October 2026"
+        function getMonthLabel(monthKey)
+        {
+            return localDate(monthKey + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        }
+
+        // Totals of one month: how many bills, how much, and how much of it is already paid.
+        function summarizeMonth(bills)
+        {
+            const total = bills.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+            const paidBills = bills.filter(b => b.paid);
+            const paidTotal = paidBills.reduce((sum, b) => sum + parseFloat(b.amount), 0);
+            return { count: bills.length, paidCount: paidBills.length, total, paidTotal };
+        }
+
+        // A month starts open when it is this month, or when it still has a bill that is overdue.
+        function shouldMonthStartOpen(month)
+        {
+            const isThisMonth = month.key === localDate(new Date()).slice(0, 7);
+            const hasOverdue = month.bills.some(bill => getBillStatus(bill).cssClass === 'overdue');
+            return isThisMonth || hasOverdue;
+        }
+
+        // Builds the top line of a month card: the month name, the bills paid, the total and a progress bar.
+        function buildMonthHeader(month)
+        {
+            const summary = summarizeMonth(month.bills);
+            const percentPaid = summary.total > 0 ? (summary.paidTotal / summary.total) * 100 : 0;
+
+            const header = document.createElement('summary');
+            header.className = 'month-header';
+
+            const top = buildElement('span', 'month-top', '');
+            top.appendChild(buildElement('span', 'month-name', getMonthLabel(month.key)));
+            top.appendChild(buildElement('span', 'month-total', formatMoney(summary.total)));
+            header.appendChild(top);
+
+            header.appendChild(buildElement('span', 'month-meta', `${summary.paidCount} of ${summary.count} paid  •  ${formatMoney(summary.total - summary.paidTotal)} left to pay`));
+
+            const track = buildElement('span', 'month-track', '');
+            const fill = buildElement('span', 'month-fill', '');
+            fill.style.width = percentPaid + '%';
+            track.appendChild(fill);
+            header.appendChild(track);
+
+            return header;
+        }
+
+        // Builds the card of one month: the header, then one row per bill.
+        function buildMonthCard(month)
+        {
+            const card = document.createElement('details');
+            card.className = 'month-card';
+            card.open = shouldMonthStartOpen(month);
+
+            card.appendChild(buildMonthHeader(month));
+
+            const list = buildElement('div', 'month-bills', '');
+            month.bills.forEach(bill => list.appendChild(buildBillRow(bill)));
+            card.appendChild(list);
+
+            return card;
+        }
+
+        // Draws the whole Bills by Month section, one card per month.
         function renderSchedules()
         {
             const container = document.getElementById('bill-schedules-list');
             container.innerHTML = '';
 
             if (allBills.length === 0) {
-                container.textContent = 'No bills added yet.';
+                container.textContent = 'No bills added yet. Add your first bill on the right.';
                 return;
             }
 
-            allBills.forEach(bill => container.appendChild(buildScheduleRow(bill)));
+            groupBillsByMonth().forEach(month => container.appendChild(buildMonthCard(month)));
         }
 
         // ============================================================
-        // BILL CHECKLIST
+        // BUTTON HANDLERS (ask the user, call the database function, refresh the page)
         // ============================================================
 
-        // Builds one checkbox row. A <label> is used so clicking the text also ticks the box.
-        function buildChecklistRow(bill)
-        {
-            const row = document.createElement('label');
-            row.className = 'checklist-row';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = bill.paid;
-            checkbox.addEventListener('change', () => handleTogglePaid(bill.id, checkbox.checked));
-
-            const labelPart = bill.split_label ? ` (${bill.split_label})` : '';
-            const dueText = localDate(bill.due_date).toLocaleDateString();
-            const text = document.createElement('span');
-            text.textContent = `${bill.name}${labelPart} — ${formatMoney(parseFloat(bill.amount))} — due ${dueText}`;
-
-            row.appendChild(checkbox);
-            row.appendChild(text);
-            return row;
-        }
-
-        // Draws the Bill Checklist section.
-        function renderChecklist()
-        {
-            const container = document.getElementById('bill-checklist-list');
-            container.innerHTML = '';
-
-            if (allBills.length === 0) {
-                container.textContent = 'No bills to check off yet.';
-                return;
-            }
-
-            allBills.forEach(bill => container.appendChild(buildChecklistRow(bill)));
-        }
         // Saves the paid / unpaid change of one bill, then refreshes the page.
         async function handleTogglePaid(billId, paidValue)
         {
@@ -548,7 +628,7 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         }
 
         // Builds the base row of a bill. The split and recurring options are added on top of it.
-        function buildBillRow(form, dueDate)
+        function buildBillData(form, dueDate)
         {
             return {
                 user_id: currentUser.userId,
@@ -566,7 +646,7 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         // One row, exactly as entered.
         function buildSingleRows(form)
         {
-            return [buildBillRow(form, form.dueDate)];
+            return [buildBillData(form, form.dueDate)];
         }
 
         // One row per month, all with the same recurring_group so they are known as one series.
@@ -577,7 +657,7 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             const rows = [];
 
             for (let i = 0; i < form.recurringMonths; i++) {
-                const row = buildBillRow(form, localDate(addMonthsClamped(form.dueDate, i)));
+                const row = buildBillData(form, localDate(addMonthsClamped(form.dueDate, i)));
                 row.is_recurring = true;
                 row.recurring_group = recurringGroup;
                 rows.push(row);
@@ -598,7 +678,7 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
                 const installmentDate = new Date(baseDate);
                 installmentDate.setDate(installmentDate.getDate() + (i * SPLIT_GAP_DAYS));
 
-                const row = buildBillRow(form, localDate(installmentDate));
+                const row = buildBillData(form, localDate(installmentDate));
                 row.amount = splitAmount;
                 row.split_group = splitGroup;
                 row.split_label = `Part ${i + 1} of ${form.splitCount}`;
