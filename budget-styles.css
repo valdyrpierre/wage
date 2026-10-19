@@ -286,3 +286,53 @@ footer {
     color: #94a3b8;
     padding: 10px 0 0;
 }
+
+/* ---------- TWO-COLUMN LAYOUT (less scrolling) ---------- */
+/* on a wide screen the sections sit side by side, on a phone or a narrow window they stack */
+
+@media (min-width: 861px) {
+
+    main {
+        max-width: 1200px;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto 1fr auto auto; /* the checklist row takes the extra height, so no gap opens under My Income */
+        grid-template-areas:
+            "head      head"
+            "summary   summary"
+            "add       income"
+            "add       checklist"
+            "schedules schedules"
+            "foot      foot";
+        align-items: start;
+    }
+
+    main > header          { grid-area: head; }
+    .budget-summary        { grid-area: summary; }
+    .budget-section        { grid-area: add; }
+    .income-section        { grid-area: income; }
+    .bill-checklist        { grid-area: checklist; }
+    .bill-schedules        { grid-area: schedules; }
+    main > footer          { grid-area: foot; }
+}
+
+/* Edit + Delete buttons sit side by side in one grid cell */
+.bill-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.edit-bill-btn {
+    background: transparent;
+    border: 1px solid #0f766e;
+    color: #0f766e;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.edit-bill-btn:hover {
+    background: #0f766e;
+    color: #fff;
+}
