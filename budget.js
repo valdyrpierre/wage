@@ -4,6 +4,7 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 
         let currentUser = null;
         let allBills = [];
+        let selectedMonthKey = null; // the month shown in Bills by Month, like "2026-10" (null = this month)
         const MAX_REASONABLE_AMOUNT = 1000000;
         const SPLIT_GAP_DAYS = 14;
         const DUE_SOON_DAYS = 5;
@@ -431,24 +432,36 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return row;
         }
 
-        // Groups all the bills by month ("2026-10"). Returns the months in order, each with its bills.
-        function groupBillsByMonth()
+        // The key of the month we are in right now, like "2026-10".
+        function getCurrentMonthKey()
         {
-            const months = new Map();
+            return localDate(new Date()).slice(0, 7);
+        }
 
-            allBills.forEach(bill => {
-                const key = bill.due_date.slice(0, 7);
-                if (!months.has(key)) months.set(key, []);
-                months.get(key).push(bill);
-            });
+        // The month that is on screen: the one the user picked, or this month if nothing was picked.
+        function getSelectedMonthKey()
+        {
+            return selectedMonthKey || getCurrentMonthKey();
+        }
 
-            return [...months.keys()].sort().map(key => ({ key, bills: months.get(key) }));
+        // Every month the picker can show: the months that have bills, plus this month. In order.
+        function getMonthKeys()
+        {
+            const keys = new Set(allBills.map(bill => bill.due_date.slice(0, 7)));
+            keys.add(getCurrentMonthKey());
+            return [...keys].sort();
         }
 
         // "2026-10" -> "October 2026"
         function getMonthLabel(monthKey)
         {
             return localDate(monthKey + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        }
+
+        // Only the bills that are due in the given month.
+        function getBillsForMonth(monthKey)
+        {
+            return allBills.filter(bill => bill.due_date.slice(0, 7) === monthKey);
         }
 
         // Totals of one month: how many bills, how much, and how much of it is already paid.
@@ -460,25 +473,64 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return { count: bills.length, paidCount: paidBills.length, total, paidTotal };
         }
 
-        // A month starts open when it is this month, or when it still has a bill that is overdue.
-        function shouldMonthStartOpen(month)
+        // Changes the month on screen and redraws the bills.
+        function selectMonth(monthKey)
         {
-            const isThisMonth = month.key === localDate(new Date()).slice(0, 7);
-            const hasOverdue = month.bills.some(bill => getBillStatus(bill).cssClass === 'overdue');
-            return isThisMonth || hasOverdue;
+            selectedMonthKey = monthKey;
+            renderSchedules();
         }
 
-        // Builds the top line of a month card: the month name, the bills paid, the total and a progress bar.
-        function buildMonthHeader(month)
+        // Builds one of the small buttons of the month picker (previous, next, this month).
+        function buildPickerButton(text, isDisabled, onClick)
         {
-            const summary = summarizeMonth(month.bills);
+            const button = buildRowButton('picker-btn', text, onClick);
+            button.disabled = isDisabled;
+            return button;
+        }
+
+        // Builds the dropdown with every month that has bills.
+        function buildMonthSelect(monthKeys, currentKey)
+        {
+            const select = document.createElement('select');
+            select.className = 'picker-select';
+
+            monthKeys.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = getMonthLabel(key);
+                option.selected = key === currentKey;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', () => selectMonth(select.value));
+            return select;
+        }
+
+        // Builds the month picker: [<] [month dropdown] [>] [This month]
+        function buildMonthPicker()
+        {
+            const monthKeys = getMonthKeys();
+            const currentKey = getSelectedMonthKey();
+            const index = monthKeys.indexOf(currentKey);
+
+            const picker = buildElement('div', 'month-picker', '');
+            picker.appendChild(buildPickerButton('‹', index <= 0, () => selectMonth(monthKeys[index - 1])));
+            picker.appendChild(buildMonthSelect(monthKeys, currentKey));
+            picker.appendChild(buildPickerButton('›', index >= monthKeys.length - 1, () => selectMonth(monthKeys[index + 1])));
+            picker.appendChild(buildPickerButton('This month', currentKey === getCurrentMonthKey(), () => selectMonth(null)));
+            return picker;
+        }
+
+        // Builds the top of the month card: the month name, the total, the bills paid and a progress bar.
+        function buildMonthHeader(monthKey, bills)
+        {
+            const summary = summarizeMonth(bills);
             const percentPaid = summary.total > 0 ? (summary.paidTotal / summary.total) * 100 : 0;
 
-            const header = document.createElement('summary');
-            header.className = 'month-header';
+            const header = buildElement('div', 'month-header', '');
 
             const top = buildElement('span', 'month-top', '');
-            top.appendChild(buildElement('span', 'month-name', getMonthLabel(month.key)));
+            top.appendChild(buildElement('span', 'month-name', getMonthLabel(monthKey)));
             top.appendChild(buildElement('span', 'month-total', formatMoney(summary.total)));
             header.appendChild(top);
 
@@ -493,34 +545,31 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return header;
         }
 
-        // Builds the card of one month: the header, then one row per bill.
-        function buildMonthCard(month)
+        // Builds the card of the month on screen: the header, then one row per bill.
+        function buildMonthCard(monthKey)
         {
-            const card = document.createElement('details');
-            card.className = 'month-card';
-            card.open = shouldMonthStartOpen(month);
+            const bills = getBillsForMonth(monthKey);
 
-            card.appendChild(buildMonthHeader(month));
+            const card = buildElement('div', 'month-card', '');
+            card.appendChild(buildMonthHeader(monthKey, bills));
 
             const list = buildElement('div', 'month-bills', '');
-            month.bills.forEach(bill => list.appendChild(buildBillRow(bill)));
+            if (bills.length === 0) list.appendChild(buildElement('p', 'month-empty', 'No bills this month.'));
+            bills.forEach(bill => list.appendChild(buildBillRow(bill)));
             card.appendChild(list);
 
             return card;
         }
 
-        // Draws the whole Bills by Month section, one card per month.
+        // Draws the Bills by Month section: the picker, then the card of ONE month
+        // (this month, until the user picks a different one).
         function renderSchedules()
         {
             const container = document.getElementById('bill-schedules-list');
             container.innerHTML = '';
 
-            if (allBills.length === 0) {
-                container.textContent = 'No bills added yet. Add your first bill on the right.';
-                return;
-            }
-
-            groupBillsByMonth().forEach(month => container.appendChild(buildMonthCard(month)));
+            container.appendChild(buildMonthPicker());
+            container.appendChild(buildMonthCard(getSelectedMonthKey()));
         }
 
         // ============================================================
