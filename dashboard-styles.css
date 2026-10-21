@@ -993,43 +993,238 @@ button:disabled {
 /* ---------- TWO-COLUMN DASHBOARD LAYOUT (less scrolling) ---------- */
 /* on a wide screen the sections sit side by side, on a phone or narrow window they stack like before */
 
-main {
-    max-width: 1200px;
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas:
-        "clock    earnings"
-        "comm     totals"
-        "chart    chart"
-        "snapshot daily"
-        "month    year"
-        "goal     goal";
-    align-items: start;
-}
+@media (min-width: 861px) {
 
-main > section { margin-top: 0; }
-
-.clock-section        { grid-area: clock; }
-.constantpay          { grid-area: earnings; }
-.commission-section   { grid-area: comm; }
-.pay-section          { grid-area: totals; }
-.income-monthly-graph { grid-area: chart; }
-.weekly-snapshot-section { grid-area: snapshot; }
-.daily-summary-section   { grid-area: daily; }
-.month-compare-section   { grid-area: month; }
-.year-totals-section     { grid-area: year; }
-.save-goal-section       { grid-area: goal; }
-
-/* the two boxes in the same row get the same height */
-.clock-section, .constantpay, .commission-section, .pay-section { align-self: stretch; }
-
-@media (max-width: 860px) {
     main {
-        grid-template-columns: 1fr;
-        grid-template-areas: none;
+        max-width: 1200px;
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+            "clock    earnings"
+            "comm     totals"
+            "chart    chart"
+            "schedule schedule"
+            "snapshot daily"
+            "month    year"
+            "goal     goal";
+        align-items: start;
     }
-    main > section { grid-area: auto; }
+
+    main > section { margin-top: 0; }
+
+    .clock-section        { grid-area: clock; }
+    .constantpay          { grid-area: earnings; }
+    .commission-section   { grid-area: comm; }
+    .pay-section          { grid-area: totals; }
+    .income-monthly-graph { grid-area: chart; }
+    .schedule-section     { grid-area: schedule; }
+    .weekly-snapshot-section { grid-area: snapshot; }
+    .daily-summary-section   { grid-area: daily; }
+    .month-compare-section   { grid-area: month; }
+    .year-totals-section     { grid-area: year; }
+    .save-goal-section       { grid-area: goal; }
+
+    /* the two boxes in the same row get the same height */
+    .clock-section, .constantpay, .commission-section, .pay-section { align-self: stretch; }
 }
 
 /* Totals as a 2 x 2 block so the box next to Commission is not a tall column */
 .pay-section .pay-grid { display: grid; grid-template-columns: 1fr 1fr; }
 .pay-section .pay-box { padding: 14px; }
+
+/* ---------- WEEKLY SCHEDULE ---------- */
+
+.schedule-section h3 {
+    font-size: 0.95rem;
+    color: #334155;
+    margin: 18px 0 10px;
+}
+
+.sched-clear {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid #dc2626;
+    color: #dc2626;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.sched-clear:hover { background: #dc2626; color: #fff; }
+
+.sched-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.sched-week-label {
+    flex: 1;
+    text-align: center;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.sched-nav-btn {
+    padding: 8px 14px;
+    border: 1px solid #0f766e;
+    border-radius: 10px;
+    background: transparent;
+    color: #0f766e;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.sched-nav-btn:hover { background: #0f766e; color: #fff; }
+
+.sched-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.sched-day {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px;
+    min-height: 120px;
+}
+
+.sched-day.today {
+    border-color: #0f766e;
+    background: #f0fdfa;
+}
+
+.sched-day-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sched-day-date {
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.sched-day-off {
+    color: #94a3b8;
+    font-size: 0.8rem;
+}
+
+.sched-chip {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    background: #ffffff;
+    border-left: 4px solid #0f766e;
+    border-radius: 8px;
+    padding: 6px 24px 6px 8px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.sched-chip-time  { font-size: 0.78rem; font-weight: 800; color: #0f172a; }
+.sched-chip-job   { font-size: 0.7rem; color: #64748b; }
+.sched-chip-hours { font-size: 0.7rem; font-weight: 700; color: #0f766e; }
+
+.sched-chip-delete {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.sched-chip-delete:hover { background: #fee2e2; color: #dc2626; }
+
+.sched-tools {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 22px;
+    margin-top: 22px;
+    padding-top: 6px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.sched-form, .sched-copy {
+    display: flex;
+    flex-direction: column;
+}
+
+.sched-form label, .sched-copy label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    margin: 12px 0 6px;
+}
+
+.sched-form input[type="date"],
+.sched-form input[type="time"],
+.sched-form input[type="number"],
+.sched-form select,
+.sched-copy input[type="number"] {
+    padding: 9px 11px;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    width: 100%;
+}
+
+.sched-time-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.sched-copy-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sched-copy-row input { width: 80px; }
+
+@media (max-width: 860px) {
+    .sched-week-grid { grid-template-columns: 1fr; }
+    .sched-day { min-height: 0; }
+    .sched-tools { grid-template-columns: 1fr; }
+    .sched-time-row { grid-template-columns: 1fr; }
+}
+
+.schedule-section .hint {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 10px;
+}
+
+.sched-form input[type="submit"],
+.sched-copy-row button {
+    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    color: #fff;
+    border: none;
+    padding: 11px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.sched-form input[type="submit"] { margin-top: 16px; }
+
+.sched-form input[type="submit"]:hover,
+.sched-copy-row button:hover { opacity: 0.92; }
