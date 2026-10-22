@@ -256,7 +256,6 @@ function addListener(id, eventName, handler)
             await loadTodaysBreaks();
             await refreshTotals();
             await renderMonthlyChart();
-            await loadWeeklySnapshot();
             await loadMonthCompare();
             await loadYearTotals();
             await loadSaveGoalPlanner();
@@ -1235,24 +1234,69 @@ function addListener(id, eventName, handler)
                     taxRate = typedRate;
             }
 
+            try { localStorage.setItem('taxRate', String(taxRate)); } catch (e) { /* private window, just don't remember it */ }
+
             refreshTotals();
             renderMonthlyChart();
             if (scheduleWeekStart) renderScheduleSummary(); // the schedule estimate also shows after tax
         });
 
-        // ---------- TAX TOGGLES ----------
-        document.querySelectorAll('.tax-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.getAttribute('data-target');
-                showAfterTax[target] = !showAfterTax[target];
-                btn.textContent = showAfterTax[target] ? 'Show Before Tax' : 'Show After Tax';
-
-                if (target === 'income-monthly-graph') {
-                    renderMonthlyChart();
-                } else {
-                    refreshTotals();
+        // puts the tax rate the user typed last time back into the box
+        function applySavedTaxRate()
+        {
+            try {
+                const saved = parseFloat(localStorage.getItem('taxRate'));
+                if (!isNaN(saved) && saved >= 0 && saved <= 100) {
+                    taxRate = saved;
+                    document.getElementById('tax-rate').value = saved;
                 }
+            } catch (e) { /* nothing saved, keep the 5% default */ }
+        }
+        applySavedTaxRate();
+
+        // ---------- COLLAPSIBLE SECTIONS ----------
+        // each <details data-key="..."> remembers if it was left open or closed
+        function initCollapsibles()
+        {
+            document.querySelectorAll('details[data-key]').forEach(box => {
+                try {
+                    const saved = localStorage.getItem('open-' + box.dataset.key);
+                    if (saved === 'yes') box.open = true;
+                    if (saved === 'no') box.open = false;
+                } catch (e) { /* keep the default */ }
+
+                box.addEventListener('toggle', () => {
+                    try { localStorage.setItem('open-' + box.dataset.key, box.open ? 'yes' : 'no'); } catch (e) { /* ignore */ }
+                });
             });
+        }
+        initCollapsibles();
+
+        // ---------- STICKY BAR POSITION ----------
+        // the jump bar sticks right under the top menu, so it needs to know how tall that menu is
+        function setNavHeight()
+        {
+            const nav = document.querySelector('.main-nav');
+            if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+        }
+        setNavHeight();
+        window.addEventListener('resize', setNavHeight);
+
+        // ---------- TAX TOGGLE ----------
+        // one button for the whole page. first it flips every "after tax" switch together,
+        // then it changes its own text, then it redraws the totals and the chart
+        addListener('tax-toggle-all', 'click', () => {
+            const turnOn = !showAfterTax['pay-section'];
+            Object.keys(showAfterTax).forEach(key => {
+                showAfterTax[key] = turnOn;
+            });
+
+            const btn = document.getElementById('tax-toggle-all');
+            btn.textContent = turnOn ? 'Showing after tax' : 'Showing before tax';
+            btn.classList.toggle('on', turnOn);
+
+            refreshTotals();
+            renderMonthlyChart();
         });
 
         // ---------- EDIT JOB (company + title) ----------
@@ -1461,7 +1505,6 @@ function addListener(id, eventName, handler)
         // ---------- INIT for this section ----------
         async function initWorkTracker() {
             // the Daily Summary is already filled in by refreshTotals(), so we start at the weekly snapshot
-            await loadWeeklySnapshot();
             await loadMonthCompare();
             await loadYearTotals();
             await loadSaveGoalPlanner();
@@ -1480,19 +1523,6 @@ function addListener(id, eventName, handler)
 
             summaryBase = { wagePay: wagePay, commissionPay: commissionPay, start: refDate, end: nextDay };
             renderDailySummary();
-
-            // 5-star rate from daily_metrics for this date
-            const { data } = await supabaseClient
-                .from('daily_metrics')
-                .select('total_customers, five_star_reviews')
-                .eq('user_id', currentUser.userId)
-                .eq('entry_date', dateStr)
-                .maybeSingle();
-
-            const rate = data && data.total_customers > 0
-                ? (data.five_star_reviews / data.total_customers) * 100
-                : 0;
-            document.getElementById('summary-star-rate').textContent = rate.toFixed(2) + '%';
         }
 
         // shows the saved wage and commission, plus what the running shift has earned so far
@@ -1515,17 +1545,6 @@ function addListener(id, eventName, handler)
             document.getElementById('summary-total-daily').textContent = formatMoney(wagePay + summaryBase.commissionPay);
         }
 
-        // ---------- WEEKLY SNAPSHOT ----------
-        async function loadWeeklySnapshot() {
-            const today = parseLocalDate(todayStr());
-            const weekStart = getRangeStart('week', today);
-            const tomorrow = getTomorrowStart();
-
-            const wagePay = await computeShiftsPay(weekStart, tomorrow);
-            const commissionPay = await computeCommissions(weekStart, tomorrow);
-            document.getElementById('snapshot-week-earnings').textContent = formatMoney(wagePay + commissionPay);
-        }
-
         // ---------- MONTH TOTALS (COMPARE) ----------
         async function loadMonthCompare() {
             const now = new Date();
@@ -1541,22 +1560,6 @@ function addListener(id, eventName, handler)
             const wagePay = await computeShiftsPay(start, end);
             const commissionPay = await computeCommissions(start, end);
             document.getElementById(`compare-${prefix}-money`).textContent = formatMoney(wagePay + commissionPay);
-
-            const { data } = await supabaseClient
-                .from('daily_metrics')
-                .select('phones_repaired, five_star_reviews, total_customers')
-                .eq('user_id', currentUser.userId)
-                .gte('entry_date', start.toISOString().split('T')[0])
-                .lt('entry_date', end.toISOString().split('T')[0]);
-
-            const phones = (data || []).reduce((sum, d) => sum + (d.phones_repaired || 0), 0);
-            const reviews = (data || []).reduce((sum, d) => sum + (d.five_star_reviews || 0), 0);
-            const customers = (data || []).reduce((sum, d) => sum + (d.total_customers || 0), 0);
-            const rate = customers > 0 ? (reviews / customers) * 100 : 0;
-
-            document.getElementById(`compare-${prefix}-phones`).textContent = phones;
-            document.getElementById(`compare-${prefix}-reviews`).textContent = reviews;
-            document.getElementById(`compare-${prefix}-rate`).textContent = rate.toFixed(2) + '%';
         }
 
         // ---------- YEAR TOTALS ----------
@@ -1657,6 +1660,8 @@ function addListener(id, eventName, handler)
         let scheduleWeekStart = null; // the Sunday of the week on screen
         let scheduleBills = [];       // the bills due in the month the estimate is for (null if they could not be loaded)
         const MAX_COPY_WEEKS = 12;
+        let editingShiftId = null;    // the id of the scheduled shift being edited (null = the form adds a new shift)
+        let toastTimer = null;        // the timer that hides the small message at the bottom of the schedule
 
         // Turns a Date into a "YYYY-MM-DD" string using the local date.
         function dateToStr(date)
@@ -1742,6 +1747,17 @@ function addListener(id, eventName, handler)
             const { error } = await supabaseClient
                 .from('scheduled_shifts')
                 .delete()
+                .eq('id', shiftId)
+                .eq('user_id', currentUser.userId);
+            return error;
+        }
+
+        // Changes the times, job, date or break of one scheduled shift.
+        async function updateScheduledShift(shiftId, changes)
+        {
+            const { error } = await supabaseClient
+                .from('scheduled_shifts')
+                .update(changes)
                 .eq('id', shiftId)
                 .eq('user_id', currentUser.userId);
             return error;
@@ -1848,6 +1864,60 @@ function addListener(id, eventName, handler)
             };
         }
 
+        // ---------- SMALL MESSAGES + REMEMBERED TIMES ----------
+
+        // Shows a small message at the bottom of the schedule for a few seconds, instead of a pop-up box.
+        // If an undo function is given, the message also has an Undo button.
+        function showScheduleToast(message, undoHandler)
+        {
+            const toast = document.getElementById('sched-toast');
+            if (!toast) return;
+
+            toast.innerHTML = '';
+            toast.appendChild(buildScheduleElement('span', 'sched-toast-text', message));
+
+            if (undoHandler) {
+                const undoButton = buildScheduleElement('button', 'sched-toast-undo', 'Undo');
+                undoButton.type = 'button';
+                undoButton.addEventListener('click', async () => {
+                    toast.classList.remove('show');
+                    await undoHandler();
+                });
+                toast.appendChild(undoButton);
+            }
+
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), undoHandler ? 8000 : 4000);
+        }
+
+        // Remembers the job and times of the last shift that was added, so the next one starts filled in.
+        // (the browser storage can be turned off, so nothing here may crash the page)
+        function rememberScheduleDefaults(form)
+        {
+            try {
+                localStorage.setItem('scheduleDefaults', JSON.stringify({ jobId: form.jobId, start: form.start, end: form.end, breakMinutes: form.breakMinutes }));
+            } catch (err) {
+                console.warn('Could not remember the schedule times:', err);
+            }
+        }
+
+        // Fills the Add Shift form with the times of the last shift that was added.
+        function applyScheduleDefaults()
+        {
+            try {
+                const saved = JSON.parse(localStorage.getItem('scheduleDefaults') || 'null');
+                if (!saved) return;
+
+                if (saved.start) document.getElementById('sched-start').value = saved.start;
+                if (saved.end) document.getElementById('sched-end').value = saved.end;
+                document.getElementById('sched-break').value = saved.breakMinutes || 0;
+                if (saved.jobId && getScheduleJob(saved.jobId)) document.getElementById('sched-job').value = saved.jobId;
+            } catch (err) {
+                console.warn('Could not read the remembered schedule times:', err);
+            }
+        }
+
         // ---------- LOAD + DRAW ----------
 
         // Loads the scheduled shifts that the week on screen AND the month estimate need, then draws everything.
@@ -1893,8 +1963,15 @@ function addListener(id, eventName, handler)
             const deleteButton = buildScheduleElement('button', 'sched-chip-delete', '✕');
             deleteButton.type = 'button';
             deleteButton.title = 'Delete this shift';
-            deleteButton.addEventListener('click', () => handleDeleteScheduledShift(shift.id));
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // so the click does not also open the shift for editing
+                handleDeleteScheduledShift(shift);
+            });
             chip.appendChild(deleteButton);
+
+            // clicking the shift loads it into the form to change it
+            chip.title = 'Click to edit this shift';
+            chip.addEventListener('click', () => startEditingShift(shift));
 
             return chip;
         }
@@ -1912,6 +1989,13 @@ function addListener(id, eventName, handler)
 
             if (dayShifts.length === 0) day.appendChild(buildScheduleElement('span', 'sched-day-off', 'Off'));
             dayShifts.forEach(shift => day.appendChild(buildScheduleChip(shift)));
+
+            // the + button opens the form for this day
+            const addButton = buildScheduleElement('button', 'sched-day-add', '+ Add');
+            addButton.type = 'button';
+            addButton.title = 'Add a shift on this day';
+            addButton.addEventListener('click', () => startAddingShiftOn(dateToStr(date)));
+            day.appendChild(addButton);
 
             return day;
         }
@@ -1933,7 +2017,15 @@ function addListener(id, eventName, handler)
             const options = { month: 'short', day: 'numeric' };
             const first = scheduleWeekStart.toLocaleDateString(undefined, options);
             const last = addDays(scheduleWeekStart, 6).toLocaleDateString(undefined, options);
-            document.getElementById('sched-week-label').textContent = first + ' – ' + last;
+
+            // the hours scheduled in this week are shown next to the dates
+            const weekStartStr = dateToStr(scheduleWeekStart);
+            const weekEndStr = dateToStr(addDays(scheduleWeekStart, 7));
+            const weekHours = scheduledShifts
+                .filter(shift => shift.shift_date >= weekStartStr && shift.shift_date < weekEndStr)
+                .reduce((sum, shift) => sum + getScheduledHours(shift), 0);
+
+            document.getElementById('sched-week-label').textContent = `${first} – ${last}  •  ${weekHours.toFixed(1)} hrs scheduled`;
         }
 
         // Fills the hours and estimated pay of the week on screen and of the month. "After tax" uses
@@ -2065,7 +2157,52 @@ function addListener(id, eventName, handler)
             }
         }
 
-        // First it checks the form, then it saves the shift, and last it shows it in the week.
+        // Puts the form in "add" mode for the given day: today's remembered times, the day filled in, and the
+        // cursor on the start time.
+        function startAddingShiftOn(dateStr)
+        {
+            stopEditingShift();
+            document.getElementById('sched-date').value = dateStr;
+            document.getElementById('sched-add-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('sched-start').focus();
+        }
+
+        // Puts the form in "edit" mode: the shift's own job, date and times are loaded, and the button says Save Changes.
+        function startEditingShift(shift)
+        {
+            editingShiftId = shift.id;
+
+            document.getElementById('sched-job').value = shift.job_id;
+            document.getElementById('sched-date').value = shift.shift_date;
+            document.getElementById('sched-start').value = shift.start_time.slice(0, 5);
+            document.getElementById('sched-end').value = shift.end_time.slice(0, 5);
+            document.getElementById('sched-break').value = shift.break_minutes || 0;
+
+            document.getElementById('sched-form-title').textContent = 'Edit shift';
+            document.getElementById('sched-submit').value = 'Save Changes';
+            document.getElementById('sched-cancel-edit').style.display = 'inline-block';
+            document.getElementById('sched-add-form').classList.add('editing');
+            document.getElementById('sched-add-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Puts the form back in "add" mode (used after saving, cancelling, or clicking a + button).
+        function stopEditingShift()
+        {
+            editingShiftId = null;
+            document.getElementById('sched-form-title').textContent = 'Add a shift';
+            document.getElementById('sched-submit').value = 'Add Shift';
+            document.getElementById('sched-cancel-edit').style.display = 'none';
+            document.getElementById('sched-add-form').classList.remove('editing');
+            document.getElementById('sched-form-status').textContent = '';
+        }
+
+        addListener('sched-cancel-edit', 'click', () => {
+            stopEditingShift();
+            applyScheduleDefaults();
+        });
+
+        // First it checks the form, then it saves the shift (a new one, or the changes of the one being edited),
+        // remembers the times for the next shift, and shows the week of that shift.
         addListener('sched-add-form', 'submit', async (e) => {
             e.preventDefault();
 
@@ -2086,34 +2223,57 @@ function addListener(id, eventName, handler)
                 return;
             }
 
-            const error = await addScheduledShifts([{
-                user_id: currentUser.userId,
+            const row = {
                 job_id: form.jobId,
                 shift_date: form.date,
                 start_time: form.start,
                 end_time: form.end,
                 break_minutes: form.breakMinutes
-            }]);
+            };
+
+            const wasEditing = editingShiftId !== null;
+            const error = wasEditing
+                ? await updateScheduledShift(editingShiftId, row)
+                : await addScheduledShifts([{ ...row, user_id: currentUser.userId }]);
 
             if (error) {
                 statusEl.textContent = 'Error saving shift: ' + error.message;
                 return;
             }
 
-            // jump to the week of the new shift so the user sees it right away
+            rememberScheduleDefaults(form);
+            stopEditingShift();
+            showScheduleToast(wasEditing ? 'Shift updated.' : 'Shift added.');
+
+            // jump to the week of the saved shift so the user sees it right away
             scheduleWeekStart = getWeekStartDate(parseLocalDate(form.date));
             await loadSchedule();
         });
 
         // ---------- DELETE ----------
 
-        // Asks first, then deletes one scheduled shift.
-        async function handleDeleteScheduledShift(shiftId)
+        // Deletes one scheduled shift right away and shows an Undo button for a few seconds
+        // (undo puts the same shift back), so there is no "are you sure" box to click through.
+        async function handleDeleteScheduledShift(shift)
         {
-            if (!confirm('Delete this scheduled shift?')) return;
+            const error = await deleteScheduledShift(shift.id);
+            if (error) return showScheduleToast('Error deleting shift: ' + error.message);
 
-            const error = await deleteScheduledShift(shiftId);
-            if (error) return alert('Error deleting shift: ' + error.message);
+            if (editingShiftId === shift.id) stopEditingShift();
+
+            showScheduleToast('Shift deleted.', async () => {
+                const restoreError = await addScheduledShifts([{
+                    user_id: currentUser.userId,
+                    job_id: shift.job_id,
+                    shift_date: shift.shift_date,
+                    start_time: shift.start_time,
+                    end_time: shift.end_time,
+                    break_minutes: shift.break_minutes
+                }]);
+
+                if (restoreError) return showScheduleToast('Could not undo: ' + restoreError.message);
+                await loadSchedule();
+            });
 
             await loadSchedule();
         }
@@ -2121,13 +2281,14 @@ function addListener(id, eventName, handler)
         // Asks first, then deletes every scheduled shift of the week on screen.
         addListener('sched-clear-week', 'click', async () => {
             const weekShifts = scheduledShifts.filter(shift => shift.shift_date >= dateToStr(scheduleWeekStart) && shift.shift_date < dateToStr(addDays(scheduleWeekStart, 7)));
-            if (weekShifts.length === 0) return alert('There are no scheduled shifts in this week.');
+            if (weekShifts.length === 0) return showScheduleToast('There are no scheduled shifts in this week.');
 
             if (!confirm(`Delete all ${weekShifts.length} scheduled shift(s) of this week?`)) return;
 
             const error = await deleteScheduledWeek(scheduleWeekStart);
-            if (error) return alert('Error clearing the week: ' + error.message);
+            if (error) return showScheduleToast('Error clearing the week: ' + error.message);
 
+            showScheduleToast('Week cleared.');
             await loadSchedule();
         });
 
@@ -2161,36 +2322,41 @@ function addListener(id, eventName, handler)
 
         // First it checks the number of weeks, then it builds the copies and skips the ones that
         // already exist, then it saves the rest and shows the next week.
-        addListener('sched-copy-btn', 'click', async () => {
-            const weeksCount = parseInt(document.getElementById('sched-copy-weeks').value, 10);
+        async function copyWeekIntoNextWeeks(weeksCount)
+        {
             const weekStartStr = dateToStr(scheduleWeekStart);
             const weekEndStr = dateToStr(addDays(scheduleWeekStart, 7));
             const weekShifts = scheduledShifts.filter(shift => shift.shift_date >= weekStartStr && shift.shift_date < weekEndStr);
 
             switch (true) {
                 case isNaN(weeksCount) || weeksCount < 1 || weeksCount > MAX_COPY_WEEKS:
-                    return alert(`Choose between 1 and ${MAX_COPY_WEEKS} weeks.`);
+                    return showScheduleToast(`Choose between 1 and ${MAX_COPY_WEEKS} weeks.`);
                 case weekShifts.length === 0:
-                    return alert('This week has no scheduled shifts to copy. Add the shifts first.');
+                    return showScheduleToast('This week has no scheduled shifts to copy. Add the shifts first.');
             }
 
             const rows = buildCopiedRows(weekShifts, weeksCount);
 
             // look at what is already scheduled in the weeks we are about to fill
             const existing = await obtainScheduledShifts(addDays(scheduleWeekStart, 7), addDays(scheduleWeekStart, 7 * (weeksCount + 1)));
-            if (existing === null) return alert('Could not check the next weeks. Try again.');
+            if (existing === null) return showScheduleToast('Could not check the next weeks. Try again.');
 
             const existingKeys = new Set(existing.map(s => getShiftKey(s.job_id, s.shift_date, s.start_time, s.end_time)));
             const newRows = rows.filter(row => !existingKeys.has(getShiftKey(row.job_id, row.shift_date, row.start_time, row.end_time)));
 
-            if (newRows.length === 0) return alert('Those weeks already have these shifts.');
+            if (newRows.length === 0) return showScheduleToast('Those weeks already have these shifts.');
 
             const error = await addScheduledShifts(newRows);
-            if (error) return alert('Error copying the week: ' + error.message);
+            if (error) return showScheduleToast('Error copying the week: ' + error.message);
 
+            showScheduleToast(`Copied ${newRows.length} shift(s) into the next ${weeksCount} week(s).`);
             scheduleWeekStart = addDays(scheduleWeekStart, 7);
             await loadSchedule();
-        });
+        }
+
+        addListener('sched-copy-next', 'click', () => copyWeekIntoNextWeeks(1));
+
+        addListener('sched-copy-btn', 'click', () => copyWeekIntoNextWeeks(parseInt(document.getElementById('sched-copy-weeks').value, 10)));
 
         // ---------- WEEK ARROWS ----------
 
@@ -2217,6 +2383,7 @@ function addListener(id, eventName, handler)
             scheduleWeekStart = getWeekStartDate(new Date());
             document.getElementById('sched-date').value = todayStr();
             renderScheduleJobOptions();
+            applyScheduleDefaults();
             await loadSchedule();
         }
 
