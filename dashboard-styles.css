@@ -1228,3 +1228,26 @@ button:disabled {
 
 .sched-form input[type="submit"]:hover,
 .sched-copy-row button:hover { opacity: 0.92; }
+
+/* ---------- BILLS VS SCHEDULE ---------- */
+
+.sched-gap-box.gap-ok {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.sched-gap-box.gap-ok .value { color: #15803d; }
+
+.sched-gap-box.gap-short {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+.sched-gap-box.gap-short .value { color: #b91c1c; }
+
+.sched-gap-detail {
+    margin-top: 12px;
+    font-size: 0.92rem;
+    color: #334155;
+    line-height: 1.45;
+}
