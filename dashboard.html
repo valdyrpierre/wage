@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="dashboard-styles.css?v=3">
+    <link rel="stylesheet" href="dashboard-styles.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
@@ -149,6 +149,17 @@
                     <div class="summary-box"><span class="label">After Tax</span><span class="value" id="sched-month-net">$0.00</span></div>
                 </div>
                 <p class="hint">Estimates use your current hourly wage, take out the unpaid break, and pay time and a half after 40 hours a week at the same company. Commission is not included.</p>
+            </div>
+
+            <div class="sched-bills">
+                <h3 id="sched-bills-label">Bills vs. your schedule</h3>
+                <div class="summary-grid-3">
+                    <div class="summary-box"><span class="label">Bills Due This Month</span><span class="value" id="sched-bills-total">$0.00</span></div>
+                    <div class="summary-box"><span class="label">Expected Take-Home</span><span class="value" id="sched-bills-income">$0.00</span></div>
+                    <div class="summary-box sched-gap-box" id="sched-gap-box"><span class="label" id="sched-gap-title">Left over</span><span class="value" id="sched-gap-amount">$0.00</span></div>
+                </div>
+                <p class="sched-gap-detail" id="sched-gap-detail"></p>
+                <p class="hint">Take-home is the estimated pay of ALL the shifts scheduled this month (worked and still to come), after the tax % above. The weekly number spreads the missing money over the weeks left in the month. Bills count whether they are paid or not.</p>
             </div>
 
             <div class="sched-tools">
@@ -298,7 +309,7 @@
 
     </main>
 
-    <script src="shared.js?v=17"></script>
-    <script src="dashboard.js?v=17"></script>
+    <script src="shared.js?v=18"></script>
+    <script src="dashboard.js?v=18"></script>
 </body>
 </html>
