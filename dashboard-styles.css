@@ -1001,10 +1001,10 @@ button:disabled {
         grid-template-areas:
             "clock    earnings"
             "comm     totals"
-            "chart    chart"
             "schedule schedule"
-            "snapshot daily"
-            "month    year"
+            "chart    chart"
+            "daily    month"
+            "year     year"
             "goal     goal";
         align-items: start;
     }
@@ -1017,7 +1017,6 @@ button:disabled {
     .pay-section          { grid-area: totals; }
     .income-monthly-graph { grid-area: chart; }
     .schedule-section     { grid-area: schedule; }
-    .weekly-snapshot-section { grid-area: snapshot; }
     .daily-summary-section   { grid-area: daily; }
     .month-compare-section   { grid-area: month; }
     .year-totals-section     { grid-area: year; }
@@ -1250,4 +1249,190 @@ button:disabled {
     font-size: 0.92rem;
     color: #334155;
     line-height: 1.45;
+}
+
+/* ---------- SCHEDULE: EASIER TO USE ---------- */
+
+.schedule-section { position: relative; }
+
+.sched-chip { cursor: pointer; transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.sched-chip:hover { box-shadow: 0 3px 8px rgba(15, 23, 42, 0.15); transform: translateY(-1px); }
+
+.sched-day-add {
+    margin-top: auto;
+    padding: 5px 8px;
+    border: 1px dashed #94a3b8;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.sched-day:hover .sched-day-add,
+.sched-day-add:focus { opacity: 1; border-color: #0f766e; color: #0f766e; background: #f0fdfa; }
+
+.sched-form.editing {
+    padding: 14px;
+    margin: -14px;
+    border-radius: 14px;
+    background: #fffbeb;
+    outline: 2px solid #f59e0b;
+}
+
+.sched-form-buttons { display: flex; gap: 10px; align-items: center; }
+.sched-form-buttons input[type="submit"] { flex: 1; }
+
+.sched-cancel-edit {
+    margin-top: 16px;
+    padding: 11px 16px;
+    border: 1px solid #94a3b8;
+    border-radius: 10px;
+    background: transparent;
+    color: #475569;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.sched-copy-one {
+    margin-top: 12px;
+    padding: 11px 16px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.sched-copy-one:hover { opacity: 0.92; }
+
+.sched-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 20px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 0.9rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 1000;
+}
+
+.sched-toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}
+
+.sched-toast-undo {
+    border: none;
+    background: transparent;
+    color: #5eead4;
+    font-weight: 800;
+    cursor: pointer;
+    padding: 0;
+}
+
+
+/* ---------- JUMP BAR + GLOBAL TAX BUTTON ---------- */
+/* sticks under the top nav so every section is one tap away and the tax switch is always reachable */
+.jump-bar {
+    position: sticky;
+    top: var(--nav-h, 56px);
+    z-index: 90;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.jump-links {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.jump-links a {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.jump-links a:hover {
+    background: #ccfbf1;
+}
+
+.tax-toggle-all {
+    padding: 7px 14px;
+    border: 1px solid #0f766e;
+    border-radius: 20px;
+    background: transparent;
+    color: #0f766e;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.tax-toggle-all.on {
+    background: #0f766e;
+    color: #fff;
+}
+
+html { scroll-behavior: smooth; }
+
+/* so a section does not hide under the sticky bar when you jump to it */
+main > section { scroll-margin-top: calc(var(--nav-h, 56px) + 60px); }
+
+/* ---------- COLLAPSIBLE SECTIONS ---------- */
+
+details > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+details > summary::-webkit-details-marker { display: none; }
+
+details > summary h2 { margin-bottom: 0; }
+
+details > summary::after {
+    content: "▾";
+    color: #64748b;
+    font-size: 1.1rem;
+    transition: transform 0.2s ease;
+}
+
+details:not([open]) > summary::after { transform: rotate(-90deg); }
+
+details[open] > summary { margin-bottom: 14px; }
+
+/* on a phone the top menu wraps into a tall block, so only the jump bar stays stuck to the top */
+@media (max-width: 640px) {
+    .main-nav { position: static; }
+    .jump-bar { top: 0; }
+    main > section { scroll-margin-top: 60px; }
 }
