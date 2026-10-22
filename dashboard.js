@@ -1655,6 +1655,7 @@ function addListener(id, eventName, handler)
         // ============================================================
         let scheduledShifts = [];     // the scheduled shifts around the week on screen (the month for the estimate too)
         let scheduleWeekStart = null; // the Sunday of the week on screen
+        let scheduleBills = [];       // the bills due in the month the estimate is for (null if they could not be loaded)
         const MAX_COPY_WEEKS = 12;
 
         // Turns a Date into a "YYYY-MM-DD" string using the local date.
@@ -1758,6 +1759,24 @@ function addListener(id, eventName, handler)
             return error;
         }
 
+        // Gets the bills that are due in the month (paid or not), so we can compare them with the schedule.
+        // Returns null if they could not be loaded.
+        async function obtainMonthBills(monthStart, monthEnd)
+        {
+            const { data, error } = await supabaseClient
+                .from('bills')
+                .select('amount, due_date')
+                .eq('user_id', currentUser.userId)
+                .gte('due_date', dateToStr(monthStart))
+                .lt('due_date', dateToStr(monthEnd));
+
+            if (error) {
+                console.error('Could not load the bills for the schedule:', error);
+                return null;
+            }
+            return data || [];
+        }
+
         // ---------- ESTIMATE ----------
 
         // Dresses a scheduled shift up as a normal shift (clock in, clock out, job wage), so the SAME
@@ -1848,6 +1867,7 @@ function addListener(id, eventName, handler)
             }
 
             scheduledShifts = shifts;
+            scheduleBills = await obtainMonthBills(month.start, month.end);
             renderSchedule();
         }
 
@@ -1935,6 +1955,70 @@ function addListener(id, eventName, handler)
             document.getElementById('sched-month-hours').textContent = monthTotals.hours.toFixed(2);
             document.getElementById('sched-month-pay').textContent = formatMoney(monthTotals.pay);
             document.getElementById('sched-month-net').textContent = formatMoney(monthTotals.pay * keepShare);
+
+            // the bills are paid from the money after tax, so the comparison uses the after tax number
+            renderBillsGap(monthTotals.pay * keepShare, month);
+        }
+
+        // How many weeks are left to earn the money in the month: the weeks from today to the end
+        // of the month (at least 1). For a month that is already over, or a month that has not
+        // started, it is the number of weeks of the whole month.
+        function getWeeksToEarn(month)
+        {
+            const today = new Date();
+            const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const countFrom = todayMidnight > month.start ? todayMidnight : month.start;
+            const monthIsOver = countFrom >= month.end;
+
+            const daysToCount = monthIsOver
+                ? Math.round((month.end - month.start) / 86400000)
+                : Math.round((month.end - countFrom) / 86400000);
+
+            return Math.max(1, Math.ceil(daysToCount / 7));
+        }
+
+        // Compares the bills of the month with the expected take-home of the scheduled shifts:
+        // - if the pay is not enough, it shows how much more is needed, in total and per week
+        // - if the pay is more than the bills, it shows how much would be left over
+        function renderBillsGap(expectedTakeHome, month)
+        {
+            const monthName = month.start.toLocaleDateString(undefined, { month: 'long' });
+            const box = document.getElementById('sched-gap-box');
+
+            document.getElementById('sched-bills-label').textContent = 'Bills vs. your schedule — ' + monthName;
+
+            if (scheduleBills === null) {
+                document.getElementById('sched-bills-total').textContent = '—';
+                document.getElementById('sched-bills-income').textContent = formatMoney(expectedTakeHome);
+                document.getElementById('sched-gap-title').textContent = 'Bills not loaded';
+                document.getElementById('sched-gap-amount').textContent = '—';
+                document.getElementById('sched-gap-detail').textContent = 'Could not load your bills. Press F12 to see why.';
+                box.className = 'summary-box sched-gap-box';
+                return;
+            }
+
+            const billsTotal = scheduleBills.reduce((sum, bill) => sum + parseFloat(bill.amount), 0);
+            const difference = expectedTakeHome - billsTotal; // positive = money left over, negative = money missing
+
+            document.getElementById('sched-bills-total').textContent = formatMoney(billsTotal);
+            document.getElementById('sched-bills-income').textContent = formatMoney(expectedTakeHome);
+
+            if (difference >= 0) {
+                box.className = 'summary-box sched-gap-box gap-ok';
+                document.getElementById('sched-gap-title').textContent = 'Left over';
+                document.getElementById('sched-gap-amount').textContent = formatMoney(difference);
+                document.getElementById('sched-gap-detail').textContent = billsTotal > 0
+                    ? `If you work every scheduled shift, you would have ${formatMoney(difference)} left over after paying all ${formatMoney(billsTotal)} of ${monthName} bills.`
+                    : `There are no bills due in ${monthName}, so all ${formatMoney(difference)} of the expected take-home is left over.`;
+                return;
+            }
+
+            const weeksToEarn = getWeeksToEarn(month);
+            box.className = 'summary-box sched-gap-box gap-short';
+            document.getElementById('sched-gap-title').textContent = 'Extra needed per week';
+            document.getElementById('sched-gap-amount').textContent = formatMoney(Math.abs(difference) / weeksToEarn);
+            document.getElementById('sched-gap-detail').textContent =
+                `Your scheduled shifts are ${formatMoney(Math.abs(difference))} short of the ${formatMoney(billsTotal)} of ${monthName} bills. Spread over the ${weeksToEarn} week(s) left to earn it, that is about ${formatMoney(Math.abs(difference) / weeksToEarn)} more per week on top of your pay.`;
         }
 
         // Draws the whole schedule section.
