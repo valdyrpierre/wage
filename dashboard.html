@@ -153,13 +153,14 @@
 
             <div class="sched-bills">
                 <h3 id="sched-bills-label">Bills vs. your schedule</h3>
-                <div class="summary-grid-3">
+                <div class="summary-grid-4">
                     <div class="summary-box"><span class="label">Bills Due This Month</span><span class="value" id="sched-bills-total">$0.00</span></div>
-                    <div class="summary-box"><span class="label">Expected Take-Home</span><span class="value" id="sched-bills-income">$0.00</span></div>
-                    <div class="summary-box sched-gap-box" id="sched-gap-box"><span class="label" id="sched-gap-title">Left over</span><span class="value" id="sched-gap-amount">$0.00</span></div>
+                    <div class="summary-box"><span class="label">Need To Earn Per Week</span><span class="value" id="sched-need-week">$0.00</span></div>
+                    <div class="summary-box"><span class="label">Scheduled Per Week</span><span class="value" id="sched-have-week">$0.00</span></div>
+                    <div class="summary-box sched-gap-box" id="sched-gap-box"><span class="label" id="sched-gap-title">Left over this month</span><span class="value" id="sched-gap-amount">$0.00</span></div>
                 </div>
                 <p class="sched-gap-detail" id="sched-gap-detail"></p>
-                <p class="hint">Take-home is the estimated pay of ALL the shifts scheduled this month (worked and still to come), after the tax % above. The weekly number spreads the missing money over the weeks left in the month. Bills count whether they are paid or not.</p>
+                <p class="hint">Need to earn per week = the bills due this month divided by the weeks in the month (days of the month / 7). Scheduled per week = the estimated pay of all the shifts scheduled this month, after the tax % above, divided by the same weeks. Bills count whether they are paid or not.</p>
             </div>
 
             <div class="sched-tools">
@@ -309,7 +310,7 @@
 
     </main>
 
-    <script src="shared.js?v=18"></script>
-    <script src="dashboard.js?v=18"></script>
+    <script src="shared.js?v=19"></script>
+    <script src="dashboard.js?v=19"></script>
 </body>
 </html>
