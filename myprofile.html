@@ -7,11 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Profile</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="myprofile-styles.css">
+    <link rel="stylesheet" href="myprofile-styles.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+    <script>
+        // first it sets the theme before the page draws, so there is no white flash. dark is the default.
+        // it uses the same saved choice as the other pages, so all pages match
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
     <nav class="main-nav">
         <div class="nav-brand">💰 WageTracker</div>
         <div class="nav-links">
@@ -24,21 +30,50 @@
         </div>
     </nav>
 
-    <header>
+    <header class="page-header">
         <h1>My Profile</h1>
+        <p class="subtext">Your account, your pay schedule and your jobs.</p>
     </header>
 
+    <div class="jump-bar">
+        <div class="jump-links">
+            <a href="#sec-hero">Summary</a>
+            <a href="#sec-update">Update Info</a>
+            <a href="#sec-jobs">Edit Jobs</a>
+            <a href="#sec-account">Account</a>
+        </div>
+        <div class="jump-actions">
+            <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
+        </div>
+    </div>
+
     <main>
-        <section class="profile-info">
-            <h2>Profile Information</h2>
-            <p id="profile-name">Name: Loading...</p>
-            <p id="profile-email">Email: Loading...</p>
-            <p id="profile-job-title">Job Title(s): Loading...</p>
-            <p id="profile-income">Income This Month: Loading...</p>
+        <section class="hero-section profile-info" id="sec-hero">
+            <div class="hero-main">
+                <span class="hero-label">Income this month</span>
+                <p class="hero-amount" id="hero-amount">$0.00</p>
+                <p class="hero-sub"><span id="hero-range">Loading...</span></p>
+            </div>
+
+            <div class="identity">
+                <span class="avatar" id="profile-avatar">?</span>
+                <div class="identity-text">
+                    <p class="identity-name" id="profile-name">Loading...</p>
+                    <p class="identity-email" id="profile-email">Loading...</p>
+                </div>
+            </div>
+
+            <div class="hero-chips">
+                <div class="hero-chip"><span class="chip-label">Jobs</span><span class="chip-value" id="hero-jobs">0</span></div>
+                <div class="hero-chip"><span class="chip-label">Job titles</span><span class="chip-value chip-text" id="profile-job-title">Loading...</span></div>
+                <div class="hero-chip"><span class="chip-label">Pay period start</span><span class="chip-value chip-text" id="hero-pay-start">Not set</span></div>
+                <div class="hero-chip"><span class="chip-label">Member since</span><span class="chip-value chip-text" id="hero-member">—</span></div>
+            </div>
         </section>
 
-        <section class="update-info">
-            <h2>Update Info</h2>
+        <section class="update-info" id="sec-update">
+            <details open data-key="update">
+            <summary><h2>Update Info</h2></summary>
             <form id="update-form">
                 <label for="update-name">Name:</label>
                 <input type="text" id="update-name" autocomplete="name" placeholder="First and last name (example: Valdyr Pierre)">
@@ -47,7 +82,10 @@
                 <input type="email" id="update-email">
 
                 <label for="update-password">New Password:</label>
-                <input type="password" id="update-password" autocomplete="new-password" placeholder="Leave blank to keep current password">
+                <div class="password-wrap">
+                    <input type="password" id="update-password" autocomplete="new-password" placeholder="Leave blank to keep current password">
+                    <button type="button" id="toggle-password" class="toggle-password">Show</button>
+                </div>
 
                 <label for="update-pay-period-start">Pay Period Start Date:</label>
                 <input type="date" id="update-pay-period-start">
@@ -56,10 +94,12 @@
                 <p id="update-status"></p>
                 <input type="submit" value="Save Changes">
             </form>
+            </details>
         </section>
 
-        <section class="edit-jobs">
-            <h2>Edit Jobs</h2>
+        <section class="edit-jobs" id="sec-jobs">
+            <details open data-key="jobs">
+            <summary><h2>Edit Jobs</h2></summary>
             <label for="job-select">Select a job:</label>
             <select id="job-select"></select>
 
@@ -79,18 +119,23 @@
                     <button type="button" id="delete-job-btn">Delete This Job</button>
                 </div>
             </form>
+            </details>
         </section>
 
-        <section class="danger-zone">
-            <h2>Account</h2>
+        <section class="danger-zone" id="sec-account">
+            <details open data-key="account">
+            <summary><h2>Account</h2></summary>
+            <div class="account-buttons">
             <button id="logout-btn">Log Out</button>
             <button id="delete-account-btn" class="danger-btn">Delete Account</button>
+            </div>
             <p class="hint">Deleting your account removes all your jobs, shifts, commissions, and bills. This cannot be undone.</p>
+            </details>
         </section>
     </main>
 
     <script src="shared.js"></script>
-    <script src="myprofile.js"></script>
+    <script src="myprofile.js?v=2"></script>
 </body>
 
 </html>
