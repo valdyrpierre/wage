@@ -12,6 +12,9 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let userJobs = [];
 let allShifts = []; // every shift belonging to the user, refreshed after every change
+let periodStats = new Map(); // pay period start (timestamp) -> { total, hours, shiftCount }, used by the top card and the bars
+let openPeriodKeys = new Set(); // the pay periods left open, so editing a shift does not close them
+let periodsRenderedOnce = false; // the first time, the current and the newest period start open
 
 // NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
 // getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
@@ -163,8 +166,11 @@ async function renderPeriods() {
     const container = document.getElementById('periods-list');
     container.innerHTML = '';
 
+    periodStats = new Map();
+
     if (allShifts.length === 0) {
         container.textContent = 'No shifts logged yet.';
+        renderPeriodSummary();
         return;
     }
 
@@ -187,6 +193,13 @@ async function renderPeriods() {
     // show most recent pay period first
     const sortedPeriods = Array.from(periods.values()).sort((a, b) => b.start - a.start);
 
+    // the first time the page loads, the current pay period and the newest one start open and the rest are closed
+    if (!periodsRenderedOnce) {
+        openPeriodKeys.add(getPayPeriodStart(new Date()).getTime());
+        if (sortedPeriods.length > 0) openPeriodKeys.add(sortedPeriods[0].start.getTime());
+        periodsRenderedOnce = true;
+    }
+
     sortedPeriods.forEach(period => {
         const periodEnd = new Date(period.start);
         periodEnd.setDate(periodEnd.getDate() + 14);
@@ -196,9 +209,20 @@ async function renderPeriods() {
 
         // period totals: sum of every completed shift's overtime-aware pay in this period
         let periodTotal = 0;
+        let periodHours = 0;
+        let periodShiftCount = 0;
         period.shifts.forEach(s => {
-            if (s.clock_out) periodTotal += shiftPayMap.get(s) || 0;
+            if (s.clock_out) {
+                periodTotal += shiftPayMap.get(s) || 0;
+                periodHours += getNetHours(s, breaksByShiftId);
+                periodShiftCount++;
+            }
         });
+
+        const periodKey = period.start.getTime();
+        periodStats.set(periodKey, { total: periodTotal, hours: periodHours, shiftCount: periodShiftCount });
+        periodEl.dataset.key = periodKey;
+        periodEl.classList.toggle('collapsed', !openPeriodKeys.has(periodKey));
 
         const periodHeader = document.createElement('div');
         periodHeader.className = 'pay-period-header';
@@ -207,6 +231,13 @@ async function renderPeriods() {
             <span class="period-total">${formatMoney(periodTotal)}</span>
         `;
         periodEl.appendChild(periodHeader);
+
+        // clicking the header opens or closes the period, and the page remembers it
+        periodHeader.addEventListener('click', () => {
+            const nowClosed = periodEl.classList.toggle('collapsed');
+            if (nowClosed) openPeriodKeys.delete(periodKey);
+            else openPeriodKeys.add(periodKey);
+        });
 
         // shifts within the period, most recent first
         period.shifts
@@ -217,7 +248,114 @@ async function renderPeriods() {
 
         container.appendChild(periodEl);
     });
+
+    renderPeriodSummary();
 }
+
+// hours worked in one finished shift, after taking out the unpaid lunch breaks
+function getNetHours(shift, breaksByShiftId) {
+    const rawHours = (new Date(shift.clock_out) - new Date(shift.clock_in)) / (1000 * 60 * 60);
+    const shiftBreaks = (breaksByShiftId && breaksByShiftId.get(shift.id)) || [];
+    const breakHours = shiftBreaks.reduce((sum, b) => {
+        if (!b.break_end) return sum;
+        return sum + (new Date(b.break_end) - new Date(b.break_start)) / (1000 * 60 * 60);
+    }, 0);
+    return Math.max(0, rawHours - breakHours);
+}
+
+// ============================================================
+// TOP CARD + LAST 6 PAY PERIODS BARS
+// ============================================================
+// first it finds the current pay period and the one before it, then it fills the big number,
+// the "last period" note and the three small boxes, then it draws the bars
+function renderPeriodSummary() {
+    const currentStart = getPayPeriodStart(new Date());
+    const currentEnd = new Date(currentStart);
+    currentEnd.setDate(currentEnd.getDate() + 14);
+
+    const previousStart = new Date(currentStart);
+    previousStart.setDate(previousStart.getDate() - 14);
+
+    const empty = { total: 0, hours: 0, shiftCount: 0 };
+    const current = periodStats.get(currentStart.getTime()) || empty;
+    const previous = periodStats.get(previousStart.getTime()) || empty;
+
+    document.getElementById('hero-amount').textContent = formatMoney(current.total);
+    document.getElementById('hero-range').textContent = formatDateRange(currentStart, currentEnd);
+    document.getElementById('hero-hours').textContent = current.hours.toFixed(2);
+    document.getElementById('hero-shifts').textContent = current.shiftCount;
+    document.getElementById('hero-average').textContent = formatMoney(current.hours > 0 ? current.total / current.hours : 0);
+
+    // the arrow is green when this period is already at or above the whole last period
+    const delta = document.getElementById('hero-delta');
+    delta.className = 'hero-delta';
+    delta.textContent = '';
+    if (previous.total > 0) {
+        const ahead = current.total >= previous.total;
+        delta.classList.add(ahead ? 'up' : 'down');
+        delta.textContent = (ahead ? '▲ ' : '▼ ') + 'Last period: ' + formatMoney(previous.total);
+    }
+
+    renderPeriodBars(currentStart);
+}
+
+// builds one bar button for the "last 6 pay periods" strip
+function buildPeriodBar(bar, best, isCurrent) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'rd-bar' + (isCurrent ? ' today' : '');
+    button.dataset.key = bar.start.getTime();
+    button.title = 'Pay period starting ' + bar.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ': ' + formatMoney(bar.total);
+
+    const amount = document.createElement('span');
+    amount.className = 'rd-amount';
+    amount.textContent = bar.total > 0 ? '$' + Math.round(bar.total) : '';
+
+    const track = document.createElement('span');
+    track.className = 'rd-track';
+    const fill = document.createElement('span');
+    fill.className = 'rd-fill';
+    fill.style.height = best > 0 ? Math.max(bar.total / best * 100, bar.total > 0 ? 6 : 0) + '%' : '0%';
+    track.appendChild(fill);
+
+    const name = document.createElement('span');
+    name.className = 'rd-day';
+    name.textContent = bar.start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+    button.appendChild(amount);
+    button.appendChild(track);
+    button.appendChild(name);
+    return button;
+}
+
+function renderPeriodBars(currentStart) {
+    const list = document.getElementById('period-bars');
+    list.innerHTML = '';
+
+    const bars = [];
+    for (let back = 5; back >= 0; back--) {
+        const start = new Date(currentStart);
+        start.setDate(start.getDate() - 14 * back);
+        const stats = periodStats.get(start.getTime());
+        bars.push({ start: start, total: stats ? stats.total : 0 });
+    }
+
+    const best = Math.max(0, ...bars.map(bar => bar.total));
+    bars.forEach((bar, index) => list.appendChild(buildPeriodBar(bar, best, index === bars.length - 1)));
+}
+
+// tapping a bar opens that pay period in the list and scrolls to it
+document.getElementById('period-bars').addEventListener('click', (event) => {
+    const bar = event.target.closest('.rd-bar');
+    if (!bar) return;
+
+    const periodEl = document.querySelector('.pay-period[data-key="' + bar.dataset.key + '"]');
+    if (!periodEl) return; // no shifts in that pay period
+
+    periodEl.classList.remove('collapsed');
+    openPeriodKeys.add(Number(bar.dataset.key));
+    periodEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 // ============================================================
 // SHIFT ROW (view mode + edit mode)
@@ -420,6 +558,101 @@ document.getElementById('add-shift-form').addEventListener('submit', async (e) =
 document.getElementById('nav-logout-btn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
     window.location.href = 'login.html';
+});
+
+// ============================================================
+// FINANCE LAYER (dark / light theme, count-up numbers, sticky bar)
+// same look as the dashboard and the budget page
+// ============================================================
+
+// the jump bar sticks right under the top menu, so it needs to know how tall that menu is
+function setNavHeight() {
+    const nav = document.querySelector('.main-nav');
+    if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+}
+
+setNavHeight();
+window.addEventListener('resize', setNavHeight);
+
+// ---------- THEME (dark / light) ----------
+function applyTheme(isDark) {
+    document.body.classList.toggle('dark', isDark);
+    document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    const goDark = !document.body.classList.contains('dark');
+    applyTheme(goDark);
+
+    try { localStorage.setItem('theme', goDark ? 'dark' : 'light'); } catch (e) { /* private window, just don't remember it */ }
+});
+
+applyTheme(document.body.classList.contains('dark'));
+
+// the "Add a Shift" link in the sticky bar also opens the form
+document.getElementById('jump-add').addEventListener('click', () => {
+    document.querySelector('.add-shift-section details').open = true;
+});
+
+// remembers if the Add a Shift form was left open or closed
+const addShiftBox = document.querySelector('.add-shift-section details');
+try {
+    if (localStorage.getItem('open-addshift') === 'yes') addShiftBox.open = true;
+} catch (e) { /* keep it closed */ }
+addShiftBox.addEventListener('toggle', () => {
+    try { localStorage.setItem('open-addshift', addShiftBox.open ? 'yes' : 'no'); } catch (e) { /* ignore */ }
+});
+
+// ---------- COUNT-UP NUMBERS ----------
+// when a money number changes it rolls from the old value to the new one instead of jumping
+function parseMoneyText(text) {
+    const cleaned = String(text).replace(/[$,%\s]/g, '');
+    if (cleaned === '' || isNaN(cleaned)) return null;
+    return parseFloat(cleaned);
+}
+
+// every roll gets a ticket number, so if a newer number arrives the older roll stops
+function rollMoney(element, from, to) {
+    const ticket = (element.__ticket || 0) + 1;
+    element.__ticket = ticket;
+    const startTime = performance.now();
+
+    function frame(now) {
+        if (element.__ticket !== ticket) return;
+
+        const progress = Math.min((now - startTime) / 650, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
+        const value = from + (to - from) * eased;
+
+        element.__shown = value;
+        element.__written = formatMoney(value);
+        element.textContent = element.__written; // remembered, so the watcher knows this write is ours
+        if (progress < 1) requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+}
+
+function handleMoneyChange(element) {
+    if (element.textContent === element.__written) return; // our own roll wrote this
+
+    const target = parseMoneyText(element.textContent);
+    if (target === null) return;
+
+    const from = element.__shown !== undefined ? element.__shown : 0;
+
+    if (Math.abs(target - from) < 1) {
+        element.__ticket = (element.__ticket || 0) + 1;
+        element.__shown = target;
+        return;
+    }
+
+    rollMoney(element, from, target);
+}
+
+['hero-amount', 'hero-average'].forEach(id => {
+    const element = document.getElementById(id);
+    new MutationObserver(() => handleMoneyChange(element)).observe(element, { childList: true, characterData: true, subtree: true });
 });
 
 init();
