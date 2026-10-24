@@ -848,6 +848,17 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         // same look as the dashboard. it only watches numbers this file already puts on the page
         // ============================================================
 
+        // ---------- STICKY BAR POSITION ----------
+        // the jump bar sticks right under the top menu, so it needs to know how tall that menu is
+        function setNavHeight()
+        {
+            const nav = document.querySelector('.main-nav');
+            if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+        }
+
+        setNavHeight();
+        window.addEventListener('resize', setNavHeight);
+
         // ---------- THEME (dark / light) ----------
         function applyTheme(isDark)
         {
