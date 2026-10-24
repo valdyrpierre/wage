@@ -16,7 +16,8 @@
 
 // Turns a plain number like 12.5 into a display string like "$12.50"
 function formatMoney(n) {
-    return '$' + n.toFixed(2);
+    // thousands commas ($4,975.93) so big money reads like a finance app
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ============================================================
