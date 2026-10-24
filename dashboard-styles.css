@@ -999,6 +999,7 @@ button:disabled {
         max-width: 1200px;
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
+            "hero     hero"
             "clock    earnings"
             "comm     totals"
             "schedule schedule"
@@ -1011,6 +1012,7 @@ button:disabled {
 
     main > section { margin-top: 0; }
 
+    .hero-section         { grid-area: hero; }
     .clock-section        { grid-area: clock; }
     .constantpay          { grid-area: earnings; }
     .commission-section   { grid-area: comm; }
@@ -1435,4 +1437,432 @@ details[open] > summary { margin-bottom: 14px; }
     .main-nav { position: static; }
     .jump-bar { top: 0; }
     main > section { scroll-margin-top: 60px; }
+}
+
+
+/* ============================================================
+   FINANCE THEME (top card, interactions, dark mode)
+   was dashboard-finance.css. it must stay at the BOTTOM so it overrides the rules above
+   ============================================================ */
+
+/* dashboard-finance.css - the finance look. loaded AFTER dashboard-styles.css.
+   first the top card + new widgets, then micro-interactions, then the dark theme overrides (body.dark) */
+
+/* ---------- NUMBERS LOOK LIKE A TRADING APP ---------- */
+.big-number, .value, .chip-value, .hero-amount, .rd-amount, .bill-amount {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* ---------- TOP CARD ---------- */
+.hero-section {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    gap: 22px;
+    grid-template-columns: 1.1fr 1fr;
+    grid-template-areas:
+        "main days"
+        "chips chips";
+    color: #e2e8f0;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.hero-section:hover { transform: none; box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45); }
+
+.hero-main  { grid-area: main; }
+.hero-days  { grid-area: days; }
+.hero-chips { grid-area: chips; }
+
+.hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.hero-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.hero-hint {
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #64748b;
+    margin-left: 6px;
+}
+
+.hero-tabs {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.hero-tab {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.hero-tab:hover { color: #fff; }
+
+.hero-tab.active {
+    background: #10b981;
+    color: #04130d;
+}
+
+.hero-amount {
+    margin-top: 14px;
+    font-size: clamp(2.6rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #f8fafc;
+}
+
+.hero-sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+
+.hero-delta:empty { display: none; }
+
+.hero-delta {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.hero-delta.up   { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+.hero-delta.down { background: rgba(248, 113, 113, 0.16); color: #f87171; }
+
+/* last 7 days bars */
+.recent-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    height: 150px;
+    margin-top: 12px;
+}
+
+.rd-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.rd-amount { height: 14px; font-size: 0.68rem; font-weight: 700; color: #cbd5e1; }
+
+.rd-track {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    border-radius: 8px;
+    background: rgba(148, 163, 184, 0.1);
+    overflow: hidden;
+}
+
+.rd-fill {
+    width: 100%;
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(180deg, #34d399, #059669);
+    transition: height 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.2s ease;
+}
+
+.rd-bar:hover .rd-fill { filter: brightness(1.25); }
+.rd-bar:hover .rd-track { background: rgba(148, 163, 184, 0.2); }
+
+.rd-day { font-size: 0.72rem; font-weight: 700; }
+.rd-bar.today .rd-day { color: #34d399; }
+.rd-bar.selected .rd-track { outline: 2px solid #34d399; outline-offset: 2px; }
+.rd-bar.selected .rd-day { color: #f8fafc; }
+
+/* the three small boxes */
+.hero-chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+
+.hero-chip {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.hero-chip:hover { transform: translateY(-2px); background: rgba(148, 163, 184, 0.14); }
+
+.chip-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; }
+.chip-value { font-size: 1.35rem; font-weight: 800; color: #f1f5f9; }
+
+.hero-chip.gap-ok .chip-value    { color: #34d399; }
+.hero-chip.gap-short .chip-value { color: #f87171; }
+.hero-chip.gap-ok    { border-color: rgba(16, 185, 129, 0.4); }
+.hero-chip.gap-short { border-color: rgba(248, 113, 113, 0.4); }
+
+@media (max-width: 860px) {
+    .hero-section {
+        grid-template-columns: 1fr;
+        grid-template-areas: "main" "days" "chips";
+    }
+}
+
+/* ---------- LITTLE INTERACTIONS ---------- */
+button { transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease, color 0.2s ease; }
+button.pressed:not(:disabled) { transform: scale(0.96); }
+
+.pay-box.clickable { cursor: pointer; }
+.pay-box.clickable:hover { transform: translateY(-2px); }
+
+.summary-box, .sched-day, .bill-row, .goal-bill-row { transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+.summary-box:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(2, 6, 23, 0.12); }
+
+/* the "you are on the clock" status gets a live pulsing dot */
+#clock-status.active::before {
+    content: "";
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: livePulse 1.6s infinite;
+}
+
+@keyframes livePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+    70%  { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* quick commission amounts */
+.quick-amounts {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.quick-amount {
+    padding: 6px 12px;
+    border: 1px solid #10b981;
+    border-radius: 999px;
+    background: transparent;
+    color: #059669;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.quick-amount:hover { background: #10b981; color: #04130d; }
+
+#add-commission-btn.nudge { animation: nudge 0.5s ease; }
+
+@keyframes nudge {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+/* jump bar buttons */
+.jump-actions { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+/* ============================================================
+   DARK THEME  (body.dark)
+   ============================================================ */
+
+body.dark {
+    background: #060b16;
+    color: #e2e8f0;
+}
+
+body.dark header {
+    background: linear-gradient(120deg, #052e2b, #064e3b, #0b1220, #052e2b);
+    background-size: 300% 300%;
+    box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
+}
+
+body.dark section {
+    background: #0e1626;
+    border: 1px solid #1b2a44;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.35);
+    color: #e2e8f0;
+}
+
+body.dark section:hover { box-shadow: 0 12px 28px rgba(2, 6, 23, 0.55); }
+
+body.dark .hero-section { background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33); }
+
+/* headings + text */
+body.dark h2,
+body.dark h3,
+body.dark .commission-job,
+body.dark .pay-box .value,
+body.dark .summary-box .value,
+body.dark .sched-week-label,
+body.dark .sched-day-date,
+body.dark .sched-chip-time,
+body.dark .compare-col h3,
+body.dark .save-goal-section h3 { color: #f1f5f9; }
+
+body.dark label,
+body.dark .commission-form-row label,
+body.dark .tax-rate-setting,
+body.dark .schedule-section h3,
+body.dark .sched-gap-detail,
+body.dark .sched-form label,
+body.dark .sched-copy label,
+body.dark .save-goal-section label,
+body.dark .goal-bill-row,
+body.dark .comparison-row,
+body.dark #commission-entries-section h3,
+body.dark #lunch-breaks-section h3,
+body.dark .break-edit-fields label { color: #cbd5e1; }
+
+body.dark #clock-status,
+body.dark .day-breakdown,
+body.dark .pay-box .label,
+body.dark .summary-box .label,
+body.dark .section-subtext,
+body.dark .disclaimer,
+body.dark .hint,
+body.dark .schedule-section .hint,
+body.dark .sched-day-name,
+body.dark .sched-day-off,
+body.dark .sched-chip-job,
+body.dark .quick-amounts,
+body.dark details > summary::after { color: #8ea0b8; }
+
+body.dark .constantpay { background: linear-gradient(160deg, #0e1626, #0a2420); }
+body.dark .big-number { color: #34d399; }
+
+/* boxes */
+body.dark .pay-box,
+body.dark .summary-box,
+body.dark .commission-row,
+body.dark .break-row,
+body.dark .goal-bill-row,
+body.dark .comparison-row,
+body.dark .sched-day,
+body.dark .sched-chip,
+body.dark .snapshot-box {
+    background: #0a1222;
+    border-color: #1e2d49;
+    color: #e2e8f0;
+}
+
+body.dark .pay-box:hover,
+body.dark .sched-day.today,
+body.dark .sched-day:hover .sched-day-add { background: #0b2a25; }
+
+body.dark .comparison-row.above { background: #0a2a1e; }
+body.dark .comparison-row.below { background: #2a1015; }
+body.dark .sched-gap-box.gap-ok { background: #0a2a1e; border-color: rgba(16, 185, 129, 0.45); }
+body.dark .sched-gap-box.gap-short { background: #2a1015; border-color: rgba(248, 113, 113, 0.45); }
+body.dark .sched-form.editing { background: #2b2410; }
+body.dark .sched-chip-delete:hover { background: #3a1820; }
+
+body.dark .progress-bar-track { background: #1b2a44; }
+body.dark .sched-tools,
+body.dark .jobs-panel-row { border-color: #1b2a44; }
+
+/* inputs */
+body.dark input,
+body.dark select,
+body.dark textarea,
+body.dark .job-select,
+body.dark .job-select-section select {
+    background: #0a1222;
+    color: #e2e8f0;
+    border-color: #26344f;
+    color-scheme: dark;
+}
+
+body.dark input::placeholder { color: #5b6b85; }
+body.dark input:focus, body.dark select:focus { border-color: #10b981; outline: none; }
+
+/* header + bars */
+body.dark .jump-bar {
+    background: rgba(8, 13, 26, 0.92);
+    border-bottom-color: #1b2a44;
+}
+
+body.dark .jump-links a { color: #34d399; }
+body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
+body.dark .tax-toggle-all { border-color: #10b981; color: #34d399; }
+body.dark .tax-toggle-all.on { background: #10b981; color: #04130d; }
+body.dark .theme-toggle { border-color: #26344f; }
+body.dark .jobs-panel { background: #0e1626; border-color: #26344f; color: #e2e8f0; }
+
+/* buttons that were teal-outline on white */
+body.dark .sched-nav-btn,
+body.dark .sched-copy-row button,
+body.dark .tax-toggle { color: #34d399; border-color: #10b981; }
+body.dark .sched-nav-btn:hover { background: #10b981; color: #04130d; }
+body.dark .sched-day-add { color: #8ea0b8; border-color: #3a4a66; }
+body.dark .cancel-commission-btn, body.dark .cancel-break-btn, body.dark .sched-cancel-edit { color: #94a3b8; border-color: #3a4a66; }
+body.dark button:disabled { background: #1e2d49 !important; color: #5b6b85 !important; }
+
+/* the "positive money" teal becomes emerald in dark */
+body.dark .value.positive, body.dark .gap-ok .value { color: #34d399; }
+body.dark .sched-gap-box.gap-short .value { color: #f87171; }
+
+/* the "Viewing" date box in the header keeps its light look in dark mode */
+body.dark .header-right input[type="date"] {
+    background: rgba(255, 255, 255, 0.95);
+    color: #0f172a;
+    border: none;
+    color-scheme: light;
 }
