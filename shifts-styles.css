@@ -13,28 +13,14 @@ body {
 }
 
 main {
-    max-width: 950px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 34px 20px 60px;
     display: grid;
     gap: 22px;
 }
 
-header {
-    text-align: center;
-}
-
-header h1 {
-    color: #0f766e;
-    font-size: 2rem;
-    font-weight: 800;
-}
-
-.subtext {
-    color: #64748b;
-    font-size: 0.95rem;
-    margin-top: 6px;
-}
+/* the header looks like the dashboard header (see the bottom of this file) */
 
 section {
     background: #ffffff;
@@ -190,6 +176,13 @@ h2 {
     text-align: right;
 }
 
+.break-note {
+    display: block;
+    font-size: 0.7rem;
+    color: #b45309;
+    font-weight: 600;
+}
+
 .shift-actions {
     display: flex;
     gap: 6px;
@@ -272,3 +265,304 @@ h2 {
     grid-column: 1 / -1;
     margin-top: 6px;
 }
+
+
+/* ============================================================
+   FINANCE LOOK (same as the dashboard and the budget page)
+   keep this at the BOTTOM so it overrides the rules above
+   ============================================================ */
+
+.hero-amount, .chip-value, .shift-pay, .period-total, .rd-amount { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ---------- HEADER + JUMP BAR (same as the dashboard) ---------- */
+.page-header {
+    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
+    background-size: 300% 300%;
+    animation: gradientShift 12s ease infinite;
+    color: #fff;
+    text-align: left;
+    padding: 26px 40px;
+    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
+}
+
+body.dark .page-header {
+    background: linear-gradient(120deg, #052e2b, #064e3b, #0b1220, #052e2b);
+    background-size: 300% 300%;
+    box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.page-header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.3px; }
+.page-header .subtext { color: #fff; opacity: 0.9; font-size: 0.95rem; margin-top: 4px; }
+
+.jump-bar {
+    position: sticky;
+    top: var(--nav-h, 56px);
+    z-index: 90;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.jump-links { display: flex; gap: 6px; overflow-x: auto; }
+
+.jump-links a {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.jump-links a:hover { background: #ccfbf1; }
+.jump-actions { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+html { scroll-behavior: smooth; }
+main > section { scroll-margin-top: calc(var(--nav-h, 56px) + 60px); }
+
+/* ---------- TOP CARD ---------- */
+.hero-section {
+    display: grid;
+    gap: 22px;
+    grid-template-columns: 1.1fr 1fr;
+    grid-template-areas:
+        "main days"
+        "chips chips";
+    color: #e2e8f0;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.hero-main  { grid-area: main; }
+.hero-days  { grid-area: days; }
+.hero-chips { grid-area: chips; }
+
+.hero-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.hero-hint { font-weight: 500; letter-spacing: 0; text-transform: none; color: #64748b; margin-left: 6px; }
+
+.hero-amount {
+    margin-top: 14px;
+    font-size: clamp(2.6rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #f8fafc;
+}
+
+.hero-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9rem; color: #94a3b8; }
+.hero-delta:empty { display: none; }
+.hero-delta { padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+.hero-delta.up   { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+.hero-delta.down { background: rgba(248, 113, 113, 0.16); color: #f87171; }
+
+/* last 6 pay periods bars */
+.period-bars {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    height: 150px;
+    margin-top: 12px;
+}
+
+.rd-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.rd-amount { height: 14px; font-size: 0.68rem; font-weight: 700; color: #cbd5e1; }
+.rd-track { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 8px; background: rgba(148, 163, 184, 0.1); overflow: hidden; }
+.rd-fill { width: 100%; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #34d399, #059669); transition: height 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.2s ease; }
+.rd-bar:hover .rd-fill { filter: brightness(1.25); }
+.rd-bar:hover .rd-track { background: rgba(148, 163, 184, 0.2); }
+.rd-day { font-size: 0.72rem; font-weight: 700; }
+.rd-bar.today .rd-day { color: #34d399; }
+.rd-bar.today .rd-track { outline: 2px solid #34d399; outline-offset: 2px; }
+
+.hero-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+
+.hero-chip {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.hero-chip:hover { transform: translateY(-2px); background: rgba(148, 163, 184, 0.14); }
+.chip-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; }
+.chip-value { font-size: 1.35rem; font-weight: 800; color: #f1f5f9; }
+
+@media (max-width: 860px) {
+    .hero-section { grid-template-columns: 1fr; grid-template-areas: "main" "days" "chips"; }
+}
+
+/* ---------- COLLAPSIBLE: Add a Shift + pay periods ---------- */
+details > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary h2 { margin-bottom: 0; }
+details > summary::after { content: "▾"; color: #64748b; font-size: 1.1rem; transition: transform 0.2s ease; }
+details:not([open]) > summary::after { transform: rotate(-90deg); }
+details[open] > summary { margin-bottom: 14px; }
+
+.pay-period-header { cursor: pointer; transition: filter 0.2s ease; }
+.pay-period-header:hover { filter: brightness(1.2); }
+.pay-period-header::after { content: "▾"; margin-left: 14px; color: #94a3b8; transition: transform 0.2s ease; }
+.pay-period.collapsed .pay-period-header { border-radius: 10px; }
+.pay-period.collapsed .pay-period-header::after { transform: rotate(-90deg); }
+.pay-period.collapsed .shift-row { display: none; }
+.period-total { margin-left: auto; }
+
+/* ---------- LITTLE INTERACTIONS ---------- */
+button, input[type="submit"] { transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease, color 0.2s ease; }
+button:active, input[type="submit"]:active { transform: scale(0.96); }
+.shift-row { transition: background 0.2s ease, transform 0.2s ease; }
+.shift-row:hover { transform: translateX(3px); }
+
+/* the shift you are in the middle of gets a live pulsing dot */
+.shift-row.active-shift .shift-job::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    animation: livePulse 1.6s infinite;
+}
+
+@keyframes livePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+    70%  { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* the shift row stacks on a phone so nothing is squeezed */
+@media (max-width: 760px) {
+    .shift-row { grid-template-columns: 1fr 1fr; row-gap: 6px; }
+    .shift-pay { text-align: left; }
+    .shift-actions { grid-column: 1 / -1; justify-content: flex-start; }
+    .shift-edit-fields { grid-column: 1 / -1; }
+    .datetime-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .main-nav { position: static; }
+    .jump-bar { top: 0; }
+    main > section { scroll-margin-top: 60px; }
+    .page-header { padding: 22px 20px; }
+}
+
+/* ============================================================
+   DARK THEME (body.dark)
+   ============================================================ */
+
+body.dark { background: #060b16; color: #e2e8f0; }
+
+body.dark section {
+    background: #0e1626;
+    border: 1px solid #1b2a44;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.35);
+}
+
+body.dark .hero-section {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border-color: rgba(148, 163, 184, 0.15);
+}
+
+body.dark h2,
+body.dark .shift-job { color: #f1f5f9; }
+
+body.dark #add-shift-form label,
+body.dark .shift-edit-fields label { color: #cbd5e1; }
+
+body.dark .jump-bar { background: rgba(8, 13, 26, 0.92); border-bottom-color: #1b2a44; }
+body.dark .jump-links a { color: #34d399; }
+body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
+body.dark .theme-toggle { border-color: #26344f; }
+body.dark details > summary::after { color: #8ea0b8; }
+
+/* inputs */
+body.dark #add-shift-form select,
+body.dark #add-shift-form input[type="datetime-local"],
+body.dark .shift-edit-fields input[type="datetime-local"] {
+    background: #0a1222;
+    color: #e2e8f0;
+    border-color: #26344f;
+    color-scheme: dark;
+}
+
+body.dark #add-shift-form select:focus,
+body.dark #add-shift-form input:focus { border-color: #10b981; }
+body.dark #add-shift-form input[type="submit"] { background: linear-gradient(135deg, #10b981, #047857); }
+
+/* hints */
+body.dark .anchor-hint { background: #2b2410; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; }
+body.dark .anchor-hint a { color: #34d399; }
+
+/* pay periods + rows */
+body.dark .pay-period-header { background: #0b1830; border: 1px solid #1e2d49; }
+body.dark .period-total { color: #34d399; }
+
+body.dark .shift-row {
+    background: #0a1222;
+    border-color: #1e2d49;
+    color: #cbd5e1;
+}
+
+body.dark .shift-row.active-shift { background: #0a2a1e; border-left-color: #10b981; }
+body.dark .shift-pay { color: #34d399; }
+body.dark .break-note { color: #fbbf24; }
+
+body.dark .edit-shift-btn,
+body.dark .save-shift-btn { background: #10b981; color: #04130d; }
+body.dark .edit-shift-btn:hover,
+body.dark .save-shift-btn:hover { background: #34d399; }
+body.dark .delete-shift-btn { color: #f87171; border-color: #f87171; }
+body.dark .delete-shift-btn:hover { background: #f87171; color: #1a0508; }
+body.dark .cancel-shift-btn { color: #94a3b8; border-color: #3a4a66; }
+body.dark .cancel-shift-btn:hover { background: #3a4a66; color: #fff; }
