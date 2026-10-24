@@ -1286,23 +1286,26 @@ function addListener(id, eventName, handler)
         setNavHeight();
         window.addEventListener('resize', setNavHeight);
 
-        // ---------- TAX TOGGLE ----------
-        // one button for the whole page. first it flips every "after tax" switch together,
-        // then it changes its own text, then it redraws the totals and the chart
-        addListener('tax-toggle-all', 'click', () => {
-            const turnOn = !showAfterTax['pay-section'];
+        // ---------- TAX SWITCH (Before tax | After tax) ----------
+        // two buttons for the whole page. the highlighted one is what the page is showing right now.
+        // first it sets every "after tax" switch the same way, then it highlights the right button,
+        // then it redraws the totals, the chart and the 7 day bars
+        function setShowAfterTax(turnOn)
+        {
             Object.keys(showAfterTax).forEach(key => {
                 showAfterTax[key] = turnOn;
             });
 
-            const btn = document.getElementById('tax-toggle-all');
-            btn.textContent = turnOn ? 'Showing after tax' : 'Showing before tax';
-            btn.classList.toggle('on', turnOn);
+            document.getElementById('tax-before').classList.toggle('active', !turnOn);
+            document.getElementById('tax-after').classList.toggle('active', turnOn);
 
             refreshTotals();
             renderMonthlyChart();
             renderRecentDays();
-        });
+        }
+
+        addListener('tax-before', 'click', () => setShowAfterTax(false));
+        addListener('tax-after', 'click', () => setShowAfterTax(true));
 
         // ---------- EDIT JOB (company + title) ----------
         // the "Edit" button next to the job name opens a small form to change the company and the job title.
