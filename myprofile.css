@@ -1,4 +1,4 @@
-/* myprofile-styles.css - My Profile Page */
+/* myprofile-styles.css - My Profile page. Same finance look as the dashboard, budget, shifts and jobs pages. */
 
 * {
     margin: 0;
@@ -10,31 +10,11 @@ body {
     font-family: 'Segoe UI', Arial, sans-serif;
     background: #eef2f5;
     min-height: 100vh;
-}
-
-header {
-    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
-    background-size: 300% 300%;
-    animation: gradientShift 12s ease infinite;
-    color: #fff;
-    padding: 26px 40px;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
-}
-
-@keyframes gradientShift {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
-
-header h1 {
-    font-size: 1.7rem;
-    font-weight: 800;
+    color: #0f172a;
 }
 
 main {
-    max-width: 700px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 34px 20px 60px;
     display: grid;
@@ -54,20 +34,184 @@ h2 {
     margin-bottom: 16px;
 }
 
-.profile-info p {
-    font-size: 1rem;
-    color: #334155;
-    margin-bottom: 10px;
+.hint {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 6px;
+    line-height: 1.4;
 }
 
-/* ---------- FORMS ---------- */
+.hero-amount, .chip-value { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
+/* ---------- HEADER + JUMP BAR (same as the dashboard) ---------- */
+.page-header {
+    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
+    background-size: 300% 300%;
+    animation: gradientShift 12s ease infinite;
+    color: #fff;
+    padding: 26px 40px;
+    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.page-header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.3px; }
+.subtext { font-size: 0.95rem; opacity: 0.9; margin-top: 4px; }
+
+.jump-bar {
+    position: sticky;
+    top: var(--nav-h, 56px);
+    z-index: 90;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.jump-links { display: flex; gap: 6px; overflow-x: auto; }
+
+.jump-links a {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.jump-links a:hover { background: #ccfbf1; }
+.jump-actions { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+html { scroll-behavior: smooth; }
+main > section { scroll-margin-top: calc(var(--nav-h, 56px) + 60px); }
+
+/* ---------- TOP CARD ---------- */
+.hero-section {
+    display: grid;
+    gap: 22px;
+    grid-template-columns: 1.1fr 1fr;
+    grid-template-areas:
+        "main identity"
+        "chips chips";
+    align-items: center;
+    color: #e2e8f0;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.hero-main  { grid-area: main; }
+.identity   { grid-area: identity; }
+.hero-chips { grid-area: chips; }
+
+.hero-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.hero-amount {
+    margin-top: 14px;
+    font-size: clamp(2.6rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #f8fafc;
+}
+
+.hero-sub { margin-top: 10px; font-size: 0.9rem; color: #94a3b8; }
+
+/* who is logged in */
+.identity {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 16px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    min-width: 0;
+}
+
+.avatar {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: #fff;
+    font-size: 1.7rem;
+    font-weight: 800;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.identity-text { min-width: 0; }
+.identity-name { font-size: 1.2rem; font-weight: 800; color: #f1f5f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity-email { margin-top: 2px; font-size: 0.88rem; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.hero-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+
+.hero-chip {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.hero-chip:hover { transform: translateY(-2px); background: rgba(148, 163, 184, 0.14); }
+.chip-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; }
+.chip-value { font-size: 1.35rem; font-weight: 800; color: #f1f5f9; }
+.chip-text { font-size: 1rem; line-height: 1.25; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+    .hero-section { grid-template-columns: 1fr; grid-template-areas: "main" "identity" "chips"; }
+}
+
+/* ---------- COLLAPSIBLE SECTIONS ---------- */
+details > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary h2 { margin-bottom: 0; }
+details > summary::after { content: "▾"; color: #64748b; font-size: 1.1rem; transition: transform 0.2s ease; }
+details:not([open]) > summary::after { transform: rotate(-90deg); }
+details[open] > summary { margin-bottom: 16px; }
+
+/* ---------- FORMS ---------- */
 form {
     display: flex;
     flex-direction: column;
 }
 
-form label {
+form label,
+.edit-jobs > details > label {
     font-size: 0.85rem;
     font-weight: 600;
     color: #334155;
@@ -75,42 +219,67 @@ form label {
     margin-top: 14px;
 }
 
-form label:first-of-type {
-    margin-top: 0;
-}
+form label:first-of-type { margin-top: 0; }
 
 form input[type="text"],
 form input[type="email"],
 form input[type="password"],
 form input[type="number"],
-form select {
-    padding: 10px 12px;
+form input[type="date"],
+form select,
+#job-select {
+    padding: 11px 13px;
     border: 2px solid #cbd5e1;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 0.95rem;
+    background: #ffffff;
+    color: #0f172a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 form input:focus,
-form select:focus {
-    border-color: #0f766e;
+form select:focus,
+#job-select:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
     outline: none;
 }
 
-form input[type="submit"] {
-    margin-top: 18px;
-    background: linear-gradient(135deg, #14b8a6, #0f766e);
-    color: #fff;
+#job-select { width: 100%; margin-bottom: 16px; }
+
+.password-wrap { position: relative; display: flex; }
+.password-wrap input { flex: 1; padding-right: 74px; }
+
+.toggle-password {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 5px 12px;
     border: none;
-    padding: 12px;
-    border-radius: 10px;
-    font-size: 1rem;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.14);
+    color: #047857;
+    font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
 }
 
-form input[type="submit"]:hover {
-    opacity: 0.92;
+form input[type="submit"] {
+    margin-top: 18px;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: #fff;
+    border: none;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.2s ease;
 }
+
+form input[type="submit"]:hover { filter: brightness(1.08); transform: translateY(-2px); }
+button:active, input[type="submit"]:active { transform: scale(0.97); }
 
 #update-status,
 #job-edit-status {
@@ -119,85 +288,127 @@ form input[type="submit"]:hover {
 }
 
 /* ---------- EDIT JOBS ---------- */
-
-.edit-jobs #job-select {
-    margin-bottom: 16px;
-}
-
 .job-edit-buttons {
     display: flex;
     gap: 10px;
     margin-top: 18px;
 }
 
-.job-edit-buttons input[type="submit"] {
-    flex: 1;
-    margin-top: 0;
-}
+.job-edit-buttons input[type="submit"] { flex: 1; margin-top: 0; }
 
 #delete-job-btn {
     background: transparent;
     border: 2px solid #dc2626;
     color: #dc2626;
     padding: 12px 16px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 700;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.12s ease;
 }
 
-#delete-job-btn:hover {
-    background: #dc2626;
-    color: #fff;
-}
+#delete-job-btn:hover { background: #dc2626; color: #fff; }
 
 /* ---------- ACCOUNT / DANGER ZONE ---------- */
+.danger-zone { border: 1px solid rgba(220, 38, 38, 0.25); }
 
-.danger-zone {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
+.account-buttons { display: grid; gap: 12px; }
 
 #logout-btn {
-    background: #0f766e;
+    background: linear-gradient(135deg, #10b981, #047857);
     color: #fff;
     border: none;
     padding: 14px;
-    border-radius: 10px;
-    font-weight: 700;
+    border-radius: 12px;
+    font-weight: 800;
     cursor: pointer;
+    transition: filter 0.2s ease, transform 0.12s ease;
 }
 
-#logout-btn:hover {
-    background: #0d5f58;
-}
+#logout-btn:hover { filter: brightness(1.08); }
 
 .danger-btn {
     background: transparent;
     border: 2px solid #dc2626;
     color: #dc2626;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-weight: 700;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.12s ease;
 }
 
-.danger-btn:hover {
-    background: #dc2626;
-    color: #fff;
+.danger-btn:hover { background: #dc2626; color: #fff; }
+
+.danger-zone .hint { font-size: 0.8rem; text-align: center; margin-top: 12px; }
+
+/* on a phone the top menu wraps into a tall block, so only the jump bar stays stuck to the top */
+@media (max-width: 640px) {
+    .main-nav { position: static; }
+    .jump-bar { top: 0; }
+    main > section { scroll-margin-top: 60px; }
+    .page-header { padding: 22px 20px; }
+    section { padding: 22px; }
+    .job-edit-buttons { flex-direction: column; }
 }
 
-.hint {
-    font-size: 0.78rem;
-    color: #94a3b8;
-    margin-top: 6px;
-    line-height: 1.4;
+/* ============================================================
+   DARK THEME (body.dark)
+   ============================================================ */
+
+body.dark { background: #060b16; color: #e2e8f0; }
+
+body.dark .page-header {
+    background: linear-gradient(120deg, #052e2b, #064e3b, #0b1220, #052e2b);
+    background-size: 300% 300%;
+    box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
 }
 
-.danger-zone .hint {
-    font-size: 0.8rem;
-    color: #94a3b8;
-    text-align: center;
+body.dark section {
+    background: #0e1626;
+    border: 1px solid #1b2a44;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.35);
 }
+
+body.dark .hero-section {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border-color: rgba(148, 163, 184, 0.15);
+}
+
+body.dark .danger-zone { border-color: rgba(248, 113, 113, 0.3); }
+
+body.dark h2 { color: #f1f5f9; }
+body.dark .hint { color: #8ea0b8; }
+body.dark details > summary::after { color: #8ea0b8; }
+
+body.dark .jump-bar { background: rgba(8, 13, 26, 0.92); border-bottom-color: #1b2a44; }
+body.dark .jump-links a { color: #34d399; }
+body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
+body.dark .theme-toggle { border-color: #26344f; }
+
+body.dark form label,
+body.dark .edit-jobs > details > label { color: #cbd5e1; }
+
+body.dark form input[type="text"],
+body.dark form input[type="email"],
+body.dark form input[type="password"],
+body.dark form input[type="number"],
+body.dark form input[type="date"],
+body.dark form select,
+body.dark #job-select {
+    background: #0a1222;
+    color: #e2e8f0;
+    border-color: #26344f;
+    color-scheme: dark;
+}
+
+body.dark input::placeholder { color: #5b6b85; }
+body.dark .toggle-password { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+
+body.dark #delete-job-btn,
+body.dark .danger-btn { color: #f87171; border-color: #f87171; }
+body.dark #delete-job-btn:hover,
+body.dark .danger-btn:hover { background: #f87171; color: #1a0508; }
