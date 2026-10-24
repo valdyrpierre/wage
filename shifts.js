@@ -3,9 +3,6 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ============================================================
-// GLOBAL STATE
-// ============================================================
 let currentUser = null;
 let userJobs = [];
 let allShifts = []; // every shift belonging to the user, refreshed after every change
