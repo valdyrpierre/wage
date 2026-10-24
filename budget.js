@@ -270,6 +270,20 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             return error;
         }
 
+        // updates a bill and every later bill of the same monthly series (name and amount only,
+        // because every bill of the series has its own due date)
+        async function updateBillSeries(bill, updatedBill)
+        {
+            const { error } = await supabaseClient
+                .from('bills')
+                .update(updatedBill)
+                .eq('recurring_group', bill.recurring_group)
+                .eq('user_id', currentUser.userId)
+                .gte('due_date', bill.due_date);
+
+            return error;
+        }
+
         // ============================================================
         // INCOME + SUMMARY
         // ============================================================
@@ -329,6 +343,9 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             const fill = document.getElementById('summary-progress-fill');
             fill.style.width = Math.min(percentCovered, 100) + '%';
             fill.classList.toggle('over', leftToSpend < 0);
+
+            // red when the bills are more than the income, green when there is money left
+            document.getElementById('summary-left').classList.toggle('negative', leftToSpend < 0);
         }
 
         // ============================================================
@@ -625,7 +642,15 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
             const problem = validateBillForm(updated) || validateDateText(updated.dueDate);
             if (problem) return alert(problem);
 
-            const error = await updateBill(billId, { name: updated.name, amount: updated.amount, due_date: updated.dueDate });
+            // if the bill repeats every month, ask if the new name and amount are for the whole series too
+            let updateWholeSeries = false;
+            if (bill.is_recurring && bill.recurring_group) {
+                updateWholeSeries = confirm('This bill repeats monthly. Click OK to change the name and amount of this AND all future occurrences in the series, or Cancel to change just this one.');
+            }
+
+            const error = updateWholeSeries
+                ? await updateBillSeries(bill, { name: updated.name, amount: updated.amount })
+                : await updateBill(billId, { name: updated.name, amount: updated.amount, due_date: updated.dueDate });
             if (error) return alert('Error updating bill: ' + error.message);
 
             await fillUserInfo();
@@ -815,4 +840,96 @@ const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         obtainCurrentUser().catch(err => {
             console.error('Budget page failed to load:', err);
             document.getElementById('income-list').textContent = 'Error loading the budget page: ' + err.message;
+        });
+
+
+        // ============================================================
+        // FINANCE LAYER (dark / light theme, count-up numbers, bill filters)
+        // same look as the dashboard. it only watches numbers this file already puts on the page
+        // ============================================================
+
+        // ---------- THEME (dark / light) ----------
+        function applyTheme(isDark)
+        {
+            document.body.classList.toggle('dark', isDark);
+            document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+        }
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const goDark = !document.body.classList.contains('dark');
+            applyTheme(goDark);
+
+            try { localStorage.setItem('theme', goDark ? 'dark' : 'light'); } catch (e) { /* private window, just don't remember it */ }
+        });
+
+        applyTheme(document.body.classList.contains('dark'));
+
+        // ---------- COUNT-UP NUMBERS ----------
+        // when a money number changes it rolls from the old value to the new one instead of jumping
+
+        // turns "$1,234.50" or "$-5.00" into a number. returns null for text like "—"
+        function parseMoneyText(text)
+        {
+            const cleaned = String(text).replace(/[$,%\s]/g, '');
+            if (cleaned === '' || isNaN(cleaned)) return null;
+            return parseFloat(cleaned);
+        }
+
+        // every roll gets a ticket number, so if a newer number arrives the older roll stops
+        function rollMoney(element, from, to)
+        {
+            const ticket = (element.__ticket || 0) + 1;
+            element.__ticket = ticket;
+            const startTime = performance.now();
+
+            function frame(now)
+            {
+                if (element.__ticket !== ticket) return;
+
+                const progress = Math.min((now - startTime) / 650, 1);
+                const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
+                const value = from + (to - from) * eased;
+
+                element.__shown = value;
+                element.__written = formatMoney(value);
+                element.textContent = element.__written; // remembered, so the watcher knows this write is ours
+                if (progress < 1) requestAnimationFrame(frame);
+            }
+
+            requestAnimationFrame(frame);
+        }
+
+        function handleMoneyChange(element)
+        {
+            if (element.textContent === element.__written) return; // our own roll wrote this
+
+            const target = parseMoneyText(element.textContent);
+            if (target === null) return;
+
+            const from = element.__shown !== undefined ? element.__shown : 0;
+
+            if (Math.abs(target - from) < 1) {
+                element.__ticket = (element.__ticket || 0) + 1;
+                element.__shown = target;
+                return;
+            }
+
+            rollMoney(element, from, target);
+        }
+
+        ['summary-income', 'summary-bills', 'summary-left'].forEach(id => {
+            const element = document.getElementById(id);
+            new MutationObserver(() => handleMoneyChange(element)).observe(element, { childList: true, characterData: true, subtree: true });
+        });
+
+        // ---------- BILL FILTERS (All | Unpaid | Overdue | Paid) ----------
+        // the list only gets a "data-filter" word, and the css hides the rows that don't match it
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.getElementById('bill-schedules-list').dataset.filter = chip.dataset.filter;
+
+                document.querySelectorAll('.filter-chip').forEach(other => {
+                    other.classList.toggle('active', other === chip);
+                });
+            });
         });
