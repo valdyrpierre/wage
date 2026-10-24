@@ -5,13 +5,19 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Info</title>
+    <title>My Jobs</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="userinfo-styles.css">
+    <link rel="stylesheet" href="userinfo-styles.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+    <script>
+        // first it sets the theme before the page draws, so there is no white flash. dark is the default.
+        // it uses the same saved choice as the other pages, so all pages match
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
     <nav class="main-nav">
         <div class="nav-brand">💰 WageTracker</div>
         <div class="nav-links">
@@ -24,12 +30,51 @@
         </div>
     </nav>
 
-    <main>
-        <header>
-            <h1>User Info</h1>
-            <p class="subtext">Tell us about your job(s), the company for each one, and your hourly wage. Hours will be tracked separately via clock in/out.</p>
-        </header>
+    <header class="page-header">
+        <h1>My Jobs</h1>
+        <p class="subtext">Your jobs, the company for each one, and your hourly wage. Hours are tracked by clocking in and out.</p>
+    </header>
 
+    <div class="jump-bar">
+        <div class="jump-links">
+            <a href="#sec-hero">Summary</a>
+            <a href="#sec-jobs">Your Jobs</a>
+            <a href="#sec-add">Add a Job</a>
+        </div>
+        <div class="jump-actions">
+            <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
+        </div>
+    </div>
+
+    <main>
+
+        <section class="hero-section" id="sec-hero">
+            <div class="hero-main">
+                <span class="hero-label">Top hourly wage</span>
+                <p class="hero-amount" id="hero-amount">$0.00</p>
+                <p class="hero-sub"><span id="hero-delta" class="hero-delta"></span><span id="hero-range">Loading...</span></p>
+            </div>
+
+            <div class="hero-days">
+                <p class="hero-label">Wage by job <span class="hero-hint">tap a bar to jump to that job</span></p>
+                <div id="job-bars" class="job-bars"></div>
+            </div>
+
+            <div class="hero-chips">
+                <div class="hero-chip"><span class="chip-label">Jobs</span><span class="chip-value" id="hero-jobs">0</span></div>
+                <div class="hero-chip"><span class="chip-label">Companies</span><span class="chip-value" id="hero-companies">0</span></div>
+                <div class="hero-chip"><span class="chip-label">Average wage</span><span class="chip-value" id="hero-average">$0.00</span></div>
+            </div>
+        </section>
+
+        <section class="jobs-section" id="sec-jobs">
+            <h2>Your Jobs</h2>
+            <div id="jobs-list" class="jobs-list">Loading...</div>
+            <p class="hint">To change a company or job title, use Edit on the Dashboard. To change a wage, use your Profile.</p>
+        </section>
+
+        <section class="add-job-section" id="sec-add">
+        <h2>Add a Job</h2>
         <form id="userinfo-form">
             <div id="jobs-container">
                 <!-- job entry template (first job) -->
@@ -50,15 +95,15 @@
 
             <button type="button" id="add_job_additional_button">+ Additional Job</button>
 
-            <p id="error-msg" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
-            <p id="success-msg" style="color: #0f766e; font-size: 0.85rem; margin-top: 10px;"></p>
+            <p id="error-msg"></p>
+            <p id="success-msg"></p>
 
             <input type="submit" value="Save & Continue">
         </form>
+        </section>
     </main>
 
     <script>
-        // TODO: replace with your actual Supabase project values
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 
@@ -148,6 +193,232 @@
                 }
             });
         }
+
+        // ============================================================
+        // YOUR JOBS LIST + TOP CARD (read only, nothing here changes the database)
+        // ============================================================
+
+        // reads every job of the logged in user, oldest first
+        async function obtainMyJobs() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) return null;
+
+            const { data, error } = await supabaseClient
+                .from('jobs')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error('Could not load your jobs:', error);
+                return null;
+            }
+            return data;
+        }
+
+        // builds one job card. textContent is used (not innerHTML) so a company name can never inject html
+        function buildJobCard(job) {
+            const card = document.createElement('div');
+            card.className = 'job-card';
+            card.id = 'job-card-' + job.id;
+
+            const badge = document.createElement('span');
+            badge.className = 'job-badge';
+            badge.textContent = (job.company || job.job_title || '?').trim().charAt(0).toUpperCase();
+
+            const text = document.createElement('div');
+            text.className = 'job-text';
+            const company = document.createElement('span');
+            company.className = 'job-company';
+            company.textContent = job.company || '(no company)';
+            const title = document.createElement('span');
+            title.className = 'job-title-line';
+            title.textContent = job.job_title;
+            text.appendChild(company);
+            text.appendChild(title);
+
+            const wage = document.createElement('span');
+            wage.className = 'job-wage';
+            wage.textContent = '$' + parseFloat(job.hourly_wage).toFixed(2) + '/hr';
+
+            card.appendChild(badge);
+            card.appendChild(text);
+            card.appendChild(wage);
+            return card;
+        }
+
+        // one bar per job, as tall as its wage compared with the best wage
+        function buildJobBar(job, bestWage) {
+            const bar = document.createElement('button');
+            bar.type = 'button';
+            bar.className = 'rd-bar';
+            bar.dataset.jobId = job.id;
+            bar.title = (job.company || '') + ' - ' + job.job_title + ': $' + parseFloat(job.hourly_wage).toFixed(2) + '/hr';
+
+            const amount = document.createElement('span');
+            amount.className = 'rd-amount';
+            amount.textContent = '$' + parseFloat(job.hourly_wage).toFixed(2);
+
+            const track = document.createElement('span');
+            track.className = 'rd-track';
+            const fill = document.createElement('span');
+            fill.className = 'rd-fill';
+            fill.style.height = Math.max(parseFloat(job.hourly_wage) / bestWage * 100, 6) + '%';
+            track.appendChild(fill);
+
+            const name = document.createElement('span');
+            name.className = 'rd-day';
+            name.textContent = (job.company || job.job_title).slice(0, 10);
+
+            bar.appendChild(amount);
+            bar.appendChild(track);
+            bar.appendChild(name);
+            return bar;
+        }
+
+        // first it works out the top wage, the average and the number of companies,
+        // then it fills the top card, the bars and the list
+        function renderMyJobs(jobs) {
+            const list = document.getElementById('jobs-list');
+            const bars = document.getElementById('job-bars');
+            list.innerHTML = '';
+            bars.innerHTML = '';
+
+            if (jobs === null) {
+                list.textContent = 'Could not load your jobs. Make sure you are logged in.';
+                document.getElementById('hero-range').textContent = '';
+                return;
+            }
+
+            if (jobs.length === 0) {
+                list.textContent = 'No jobs yet. Add your first job below.';
+                document.getElementById('hero-range').textContent = 'No jobs yet';
+                return;
+            }
+
+            const wages = jobs.map(job => parseFloat(job.hourly_wage));
+            const bestWage = Math.max(...wages);
+            const averageWage = wages.reduce((sum, wage) => sum + wage, 0) / wages.length;
+            const bestJob = jobs[wages.indexOf(bestWage)];
+            const companyCount = new Set(jobs.map(job => (job.company || '').trim().toLowerCase())).size;
+
+            document.getElementById('hero-amount').textContent = '$' + bestWage.toFixed(2);
+            document.getElementById('hero-delta').textContent = '▲ ' + (bestJob.company || bestJob.job_title);
+            document.getElementById('hero-delta').className = 'hero-delta up';
+            document.getElementById('hero-range').textContent = 'per hour at your highest paying job';
+            document.getElementById('hero-jobs').textContent = jobs.length;
+            document.getElementById('hero-companies').textContent = companyCount;
+            document.getElementById('hero-average').textContent = '$' + averageWage.toFixed(2);
+
+            jobs.forEach(job => {
+                list.appendChild(buildJobCard(job));
+                bars.appendChild(buildJobBar(job, bestWage));
+            });
+        }
+
+        // tapping a bar scrolls to that job's card and makes it flash once
+        document.getElementById('job-bars').addEventListener('click', (e) => {
+            const bar = e.target.closest('.rd-bar');
+            if (!bar) return;
+
+            const card = document.getElementById('job-card-' + bar.dataset.jobId);
+            if (!card) return;
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.remove('flash');
+            void card.offsetWidth; // restarts the animation if it is tapped twice
+            card.classList.add('flash');
+        });
+
+        obtainMyJobs().then(renderMyJobs).catch(err => {
+            console.error('My Jobs failed to load:', err);
+            renderMyJobs(null);
+        });
+
+        // ============================================================
+        // FINANCE LAYER (dark / light theme, count-up numbers, sticky bar)
+        // same look as the dashboard, budget and shifts pages
+        // ============================================================
+
+        // the jump bar sticks right under the top menu, so it needs to know how tall that menu is
+        function setNavHeight() {
+            const nav = document.querySelector('.main-nav');
+            if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+        }
+
+        setNavHeight();
+        window.addEventListener('resize', setNavHeight);
+
+        // ---------- THEME (dark / light) ----------
+        function applyTheme(isDark) {
+            document.body.classList.toggle('dark', isDark);
+            document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+        }
+
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const goDark = !document.body.classList.contains('dark');
+            applyTheme(goDark);
+
+            try { localStorage.setItem('theme', goDark ? 'dark' : 'light'); } catch (e) { /* private window, just don't remember it */ }
+        });
+
+        applyTheme(document.body.classList.contains('dark'));
+
+        // ---------- COUNT-UP NUMBERS ----------
+        // when a money number changes it rolls from the old value to the new one instead of jumping
+        function parseMoneyText(text) {
+            const cleaned = String(text).replace(/[$,%\s]/g, '');
+            if (cleaned === '' || isNaN(cleaned)) return null;
+            return parseFloat(cleaned);
+        }
+
+        function formatWage(value) {
+            return '$' + value.toFixed(2);
+        }
+
+        // every roll gets a ticket number, so if a newer number arrives the older roll stops
+        function rollMoney(element, from, to) {
+            const ticket = (element.__ticket || 0) + 1;
+            element.__ticket = ticket;
+            const startTime = performance.now();
+
+            function frame(now) {
+                if (element.__ticket !== ticket) return;
+
+                const progress = Math.min((now - startTime) / 650, 1);
+                const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
+                const value = from + (to - from) * eased;
+
+                element.__shown = value;
+                element.__written = formatWage(value);
+                element.textContent = element.__written; // remembered, so the watcher knows this write is ours
+                if (progress < 1) requestAnimationFrame(frame);
+            }
+
+            requestAnimationFrame(frame);
+        }
+
+        function handleMoneyChange(element) {
+            if (element.textContent === element.__written) return; // our own roll wrote this
+
+            const target = parseMoneyText(element.textContent);
+            if (target === null) return;
+
+            const from = element.__shown !== undefined ? element.__shown : 0;
+
+            if (Math.abs(target - from) < 0.5) {
+                element.__ticket = (element.__ticket || 0) + 1;
+                element.__shown = target;
+                return;
+            }
+
+            rollMoney(element, from, target);
+        }
+
+        ['hero-amount', 'hero-average'].forEach(id => {
+            const element = document.getElementById(id);
+            new MutationObserver(() => handleMoneyChange(element)).observe(element, { childList: true, characterData: true, subtree: true });
+        });
 
         // set up autocomplete for the first job entry that's already on the page
         setupAutocomplete('job_title_0', 'autocomplete_list_0');
