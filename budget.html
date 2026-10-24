@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Budget</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="budget-styles.css?v=6">
+    <link rel="stylesheet" href="budget-styles.css?v=7">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -31,14 +31,24 @@
     </nav>
 
     <header class="page-header">
-        <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
         <h1>Budget</h1>
         <p class="subtext">Track your bills against what you've earned this month.</p>
     </header>
 
+    <div class="jump-bar">
+        <div class="jump-links">
+            <a href="#sec-summary">Summary</a>
+            <a href="#sec-bills">Bills</a>
+            <a href="#sec-add">Add a Bill</a>
+        </div>
+        <div class="jump-actions">
+            <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
+        </div>
+    </div>
+
     <main>
 
-        <section class="budget-summary">
+        <section class="budget-summary" id="sec-summary">
             <h2>This Month</h2>
             <div class="summary-grid">
                 <div class="summary-box income-box">
@@ -64,7 +74,7 @@
             <p class="income-line" id="income-list">Loading...</p>
         </section>
 
-        <section class="bill-schedules">
+        <section class="bill-schedules" id="sec-bills">
             <h2>Bills by Month</h2>
             <div class="bill-filters" role="group" aria-label="Filter the bills">
                 <button type="button" class="filter-chip active" data-filter="all">All</button>
@@ -75,7 +85,7 @@
             <div id="bill-schedules-list" data-filter="all">Loading...</div>
         </section>
 
-        <section class="budget-section">
+        <section class="budget-section" id="sec-add">
             <h2>Add a Bill</h2>
             <form id="add-bill-form">
                 <label for="bill-name">Bill Name:</label>
@@ -119,7 +129,7 @@
     </main>
 
     <script src="shared.js"></script>
-    <script src="budget.js?v=7"></script>
+    <script src="budget.js?v=8"></script>
 </body>
 
 </html>
