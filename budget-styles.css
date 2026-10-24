@@ -517,28 +517,6 @@ footer {
 
 .summary-box .value, .bill-amount, .month-total { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 
-/* ---------- THEME BUTTON ---------- */
-.page-header { position: relative; }
-
-/* the cards slide up over the header, so they must sit above it */
-main { position: relative; z-index: 1; }
-
-.theme-toggle {
-    position: absolute;
-    top: 16px;
-    right: 20px;
-    width: 36px;
-    height: 36px;
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
-    font-size: 1rem;
-    cursor: pointer;
-    transition: transform 0.12s ease, background 0.2s ease;
-}
-
-.theme-toggle:hover { background: rgba(255, 255, 255, 0.25); }
-.theme-toggle:active { transform: scale(0.92); }
 
 /* ---------- SUMMARY = THE HERO CARD ---------- */
 .budget-summary {
@@ -625,7 +603,6 @@ button:active, input[type="submit"]:active { transform: scale(0.96); }
 
 body.dark { background: #060b16; color: #e2e8f0; }
 
-body.dark .page-header { background: linear-gradient(135deg, #052e2b 0%, #064e3b 60%, #0b1220 100%); }
 
 body.dark section {
     background: #0e1626;
@@ -699,3 +676,99 @@ body.dark .picker-select:focus { border-color: #10b981; }
 body.dark #recurring-months-wrap { background: #0a2a1e; border-color: rgba(16, 185, 129, 0.35); }
 body.dark #add-bill-form input[type="submit"] { background: linear-gradient(135deg, #10b981, #047857); }
 body.dark .bill-check { accent-color: #10b981; }
+
+
+/* ============================================================
+   SAME HEADER + JUMP BAR AS THE DASHBOARD
+   ============================================================ */
+
+.page-header {
+    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
+    background-size: 300% 300%;
+    animation: gradientShift 12s ease infinite;
+    text-align: left;
+    padding: 26px 40px;
+    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
+}
+
+body.dark .page-header {
+    background: linear-gradient(120deg, #052e2b, #064e3b, #0b1220, #052e2b);
+    background-size: 300% 300%;
+    box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.page-header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.3px; }
+.subtext { margin-top: 4px; }
+
+/* the cards no longer slide up over the header */
+main { margin: 0 auto; padding-top: 34px; }
+
+/* the summary keeps its hero glow in dark mode (the generic dark section rule would remove it) */
+body.dark .budget-summary {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+}
+
+/* sticky bar under the top menu, with the theme button */
+.jump-bar {
+    position: sticky;
+    top: var(--nav-h, 56px);
+    z-index: 90;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.jump-links { display: flex; gap: 6px; overflow-x: auto; }
+
+.jump-links a {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.jump-links a:hover { background: #ccfbf1; }
+.jump-actions { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+body.dark .jump-bar { background: rgba(8, 13, 26, 0.92); border-bottom-color: #1b2a44; }
+body.dark .jump-links a { color: #34d399; }
+body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
+body.dark .theme-toggle { border-color: #26344f; }
+
+html { scroll-behavior: smooth; }
+main > section { scroll-margin-top: calc(var(--nav-h, 56px) + 60px); }
+
+/* on a phone the top menu wraps into a tall block, so only the jump bar stays stuck to the top */
+@media (max-width: 640px) {
+    .main-nav { position: static; }
+    .jump-bar { top: 0; }
+    main > section { scroll-margin-top: 60px; }
+    .page-header { padding: 22px 20px; }
+}
