@@ -508,3 +508,194 @@ footer {
     text-align: center;
     padding: 18px 0;
 }
+
+
+/* ============================================================
+   FINANCE LOOK (same as the dashboard): hero summary, filters, dark mode
+   keep this at the BOTTOM so it overrides the rules above
+   ============================================================ */
+
+.summary-box .value, .bill-amount, .month-total { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ---------- THEME BUTTON ---------- */
+.page-header { position: relative; }
+
+/* the cards slide up over the header, so they must sit above it */
+main { position: relative; z-index: 1; }
+
+.theme-toggle {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.12s ease, background 0.2s ease;
+}
+
+.theme-toggle:hover { background: rgba(255, 255, 255, 0.25); }
+.theme-toggle:active { transform: scale(0.92); }
+
+/* ---------- SUMMARY = THE HERO CARD ---------- */
+.budget-summary {
+    color: #e2e8f0;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.3);
+}
+
+.budget-summary h2 {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.budget-summary .summary-box {
+    background: rgba(148, 163, 184, 0.08);
+    border-color: rgba(148, 163, 184, 0.16);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.budget-summary .summary-box:hover { transform: translateY(-2px); background: rgba(148, 163, 184, 0.14); }
+.budget-summary .summary-box .label { color: #94a3b8; }
+.budget-summary .summary-box .value { color: #f1f5f9; }
+.budget-summary .income-box { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.35); }
+.budget-summary .income-box .value { color: #34d399; }
+
+/* "Left to Spend" is the number that matters, so it is bigger and green / red */
+.budget-summary .left-box .value { font-size: 1.8rem; color: #34d399; }
+.budget-summary .left-box .value.negative { color: #f87171; }
+
+.budget-summary .progress-bar-track { background: rgba(148, 163, 184, 0.18); }
+.budget-summary .income-line { color: #94a3b8; }
+
+/* ---------- BILL FILTERS ---------- */
+.bill-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.filter-chip {
+    padding: 6px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.12s ease;
+}
+
+.filter-chip:hover { border-color: #10b981; color: #059669; }
+.filter-chip:active { transform: scale(0.95); }
+.filter-chip.active { background: #10b981; border-color: #10b981; color: #04130d; }
+
+/* the list only has a data-filter word, these rules hide the rows that don't match */
+#bill-schedules-list[data-filter="unpaid"]  .bill-row.paid { display: none; }
+#bill-schedules-list[data-filter="paid"]    .bill-row:not(.paid) { display: none; }
+#bill-schedules-list[data-filter="overdue"] .bill-row:not(.overdue) { display: none; }
+
+/* ---------- LITTLE INTERACTIONS ---------- */
+.bill-row { transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease; }
+.bill-row:hover { transform: translateX(3px); box-shadow: 0 6px 14px rgba(2, 6, 23, 0.12); }
+button, input[type="submit"] { transition: transform 0.12s ease, filter 0.2s ease, background 0.2s ease, color 0.2s ease; }
+button:active, input[type="submit"]:active { transform: scale(0.96); }
+
+.bill-row.overdue .bill-status { animation: overduePulse 2s ease-in-out infinite; }
+
+@keyframes overduePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* ============================================================
+   DARK THEME (body.dark)
+   ============================================================ */
+
+body.dark { background: #060b16; color: #e2e8f0; }
+
+body.dark .page-header { background: linear-gradient(135deg, #052e2b 0%, #064e3b 60%, #0b1220 100%); }
+
+body.dark section {
+    background: #0e1626;
+    border: 1px solid #1b2a44;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.35);
+}
+
+body.dark .budget-summary { border-color: rgba(148, 163, 184, 0.15); }
+
+body.dark h2,
+body.dark .month-name,
+body.dark .bill-name,
+body.dark .bill-amount,
+body.dark .picker-select { color: #f1f5f9; }
+
+body.dark .month-total { color: #34d399; }
+body.dark .month-meta,
+body.dark .bill-due,
+body.dark .hint,
+body.dark .month-empty,
+body.dark #bill-schedules-list,
+body.dark footer { color: #8ea0b8; }
+body.dark .bill-tag { color: #34d399; }
+
+/* month cards + rows */
+body.dark .month-card { background: #0a1222; border-color: #1e2d49; box-shadow: 0 6px 16px rgba(2, 6, 23, 0.4); }
+body.dark .month-header { background: #0d172b; border-bottom-color: #1e2d49; }
+body.dark .month-track { background: #1b2a44; }
+body.dark .bill-row { background: #0e1a30; border-left-color: #3a4a66; }
+body.dark .bill-row.due-soon { background: #2b2410; border-left-color: #f59e0b; }
+body.dark .bill-row.overdue { background: #2a1015; border-left-color: #f87171; }
+body.dark .bill-row.paid { background: #0a2a1e; border-left-color: #10b981; }
+body.dark .bill-row.paid .bill-name { color: #8ea0b8; }
+
+body.dark .bill-status { background: #1b2a44; color: #94a3b8; }
+body.dark .bill-status.paid { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+body.dark .bill-status.due-soon { background: rgba(245, 158, 11, 0.18); color: #fbbf24; }
+body.dark .bill-status.overdue { background: rgba(248, 113, 113, 0.18); color: #f87171; }
+
+body.dark .edit-bill-btn { color: #34d399; border-color: #10b981; }
+body.dark .edit-bill-btn:hover { background: #10b981; color: #04130d; }
+body.dark .delete-bill-btn { color: #f87171; border-color: #f87171; }
+body.dark .delete-bill-btn:hover { background: #f87171; color: #1a0508; }
+
+/* picker + filters */
+body.dark .picker-btn { color: #34d399; border-color: #10b981; }
+body.dark .picker-btn:hover:not(:disabled) { background: #10b981; color: #04130d; }
+body.dark .filter-chip { border-color: #26344f; color: #8ea0b8; }
+body.dark .filter-chip:hover { border-color: #10b981; color: #34d399; }
+body.dark .filter-chip.active { background: #10b981; border-color: #10b981; color: #04130d; }
+
+/* the add form */
+body.dark #add-bill-form label,
+body.dark .checkbox-label { color: #cbd5e1; }
+
+body.dark #add-bill-form input[type="text"],
+body.dark #add-bill-form input[type="number"],
+body.dark #add-bill-form input[type="date"],
+body.dark #add-bill-form select,
+body.dark .picker-select {
+    background: #0a1222;
+    color: #e2e8f0;
+    border-color: #26344f;
+    color-scheme: dark;
+}
+
+body.dark #add-bill-form input:focus,
+body.dark #add-bill-form select:focus,
+body.dark .picker-select:focus { border-color: #10b981; }
+
+body.dark #recurring-months-wrap { background: #0a2a1e; border-color: rgba(16, 185, 129, 0.35); }
+body.dark #add-bill-form input[type="submit"] { background: linear-gradient(135deg, #10b981, #047857); }
+body.dark .bill-check { accent-color: #10b981; }
