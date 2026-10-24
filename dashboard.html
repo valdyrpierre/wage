@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="dashboard-styles.css?v=8">
+    <link rel="stylesheet" href="dashboard-styles.css?v=9">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
@@ -60,7 +60,10 @@
         </div>
         <div class="jump-actions">
         <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
-        <button id="tax-toggle-all" type="button" class="tax-toggle-all" title="Switch every amount on this page between before and after tax">Showing before tax</button>
+        <div class="tax-switch" role="group" aria-label="Show amounts before or after tax" title="Switch every amount on this page between before and after tax">
+            <button id="tax-before" type="button" class="tax-switch-btn active">Before tax</button>
+            <button id="tax-after" type="button" class="tax-switch-btn">After tax</button>
+        </div>
         </div>
     </div>
 
@@ -353,6 +356,6 @@
     </main>
 
     <script src="shared.js?v=21"></script>
-    <script src="dashboard.js?v=23"></script>
+    <script src="dashboard.js?v=24"></script>
 </body>
 </html>
