@@ -1385,23 +1385,6 @@ button:disabled {
     background: #ccfbf1;
 }
 
-.tax-toggle-all {
-    padding: 7px 14px;
-    border: 1px solid #0f766e;
-    border-radius: 20px;
-    background: transparent;
-    color: #0f766e;
-    font-size: 0.8rem;
-    font-weight: 700;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.tax-toggle-all.on {
-    background: #0f766e;
-    color: #fff;
-}
-
 html { scroll-behavior: smooth; }
 
 /* so a section does not hide under the sticky bar when you jump to it */
@@ -1841,9 +1824,7 @@ body.dark .jump-bar {
 
 body.dark .jump-links a { color: #34d399; }
 body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
-body.dark .tax-toggle-all { border-color: #10b981; color: #34d399; }
-body.dark .tax-toggle-all.on { background: #10b981; color: #04130d; }
-body.dark .theme-toggle { border-color: #26344f; }
+body.dark body.dark body.dark .theme-toggle { border-color: #26344f; }
 body.dark .jobs-panel { background: #0e1626; border-color: #26344f; color: #e2e8f0; }
 
 /* buttons that were teal-outline on white */
@@ -1866,3 +1847,32 @@ body.dark .header-right input[type="date"] {
     border: none;
     color-scheme: light;
 }
+
+/* ---------- BEFORE / AFTER TAX SWITCH ---------- */
+.tax-switch {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+.tax-switch-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.tax-switch-btn.active {
+    background: #0f766e;
+    color: #fff;
+}
+
+body.dark .tax-switch { background: #16233b; }
+body.dark .tax-switch-btn { color: #8ea0b8; }
+body.dark .tax-switch-btn.active { background: #10b981; color: #04130d; }
