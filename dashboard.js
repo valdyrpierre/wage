@@ -47,6 +47,7 @@ function addListener(id, eventName, handler)
         let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
         let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
         let summaryBase = null; // the Daily Summary's saved wage + commission for its date, plus the date range, so the live timer can add the running shift on top
+        let recentDays = []; // the last 7 days for the bars in the top card: { date, amount }
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
@@ -1140,6 +1141,8 @@ function addListener(id, eventName, handler)
             // the Daily Summary shows the same date as the "Viewing:" picker (today to start).
             // clock out, commission and break changes all come through here, so it stays up to date
             await loadDailySummaryForDate(document.getElementById('view-date').value || todayStr());
+
+            loadRecentDays().catch(error => console.warn('last 7 days failed:', error.message));
         }
 
         // first it will take the saved totals for each period, then if a shift is running
@@ -1238,6 +1241,7 @@ function addListener(id, eventName, handler)
 
             refreshTotals();
             renderMonthlyChart();
+            renderRecentDays();
             if (scheduleWeekStart) renderScheduleSummary(); // the schedule estimate also shows after tax
         });
 
@@ -1297,6 +1301,7 @@ function addListener(id, eventName, handler)
 
             refreshTotals();
             renderMonthlyChart();
+            renderRecentDays();
         });
 
         // ---------- EDIT JOB (company + title) ----------
@@ -1446,14 +1451,14 @@ function addListener(id, eventName, handler)
                         {
                             label: 'Wage Earnings',
                             data: wageData,
-                            backgroundColor: '#0f766e',
+                            backgroundColor: '#10b981',
                             borderRadius: 6,
                             stack: 'income'
                         },
                         {
                             label: 'Commission',
                             data: commissionData,
-                            backgroundColor: '#f59e0b',
+                            backgroundColor: '#fbbf24',
                             borderRadius: 6,
                             stack: 'income'
                         }
@@ -1463,14 +1468,15 @@ function addListener(id, eventName, handler)
                     responsive: true,
                     animation: { duration: 600, easing: 'easeOutQuart' },
                     scales: {
-                        x: { stacked: true, grid: { display: false } },
+                        x: { stacked: true, grid: { display: false }, ticks: { color: getChartColors().text } },
                         y: {
                             stacked: true,
-                            ticks: { callback: (val) => '$' + val }
+                            grid: { color: getChartColors().grid },
+                            ticks: { color: getChartColors().text, callback: (val) => '$' + val }
                         }
                     },
                     plugins: {
-                        legend: { position: 'bottom' },
+                        legend: { position: 'bottom', labels: { color: getChartColors().text } },
                         tooltip: {
                             callbacks: {
                                 label: (ctx) => ctx.dataset.label + ': ' + formatMoney(ctx.raw)
@@ -1544,6 +1550,115 @@ function addListener(id, eventName, handler)
             document.getElementById('summary-commission-pay').textContent = formatMoney(summaryBase.commissionPay);
             document.getElementById('summary-total-daily').textContent = formatMoney(wagePay + summaryBase.commissionPay);
         }
+
+        // ---------- LAST 7 DAYS (the clickable bars in the top card) ----------
+        // first it will get the wage + commission of each of the last 7 days (today is the last bar),
+        // then it will draw one bar per day. clicking a bar puts that date in "Viewing:" and reloads the page numbers
+        async function loadRecentDays()
+        {
+            const today = parseLocalDate(todayStr());
+            const ranges = [];
+
+            for (let back = 6; back >= 0; back--) {
+                const start = new Date(today);
+                start.setDate(start.getDate() - back);
+                const end = new Date(start);
+                end.setDate(end.getDate() + 1);
+                ranges.push({ start: start, end: end });
+            }
+
+            const amounts = await Promise.all(ranges.map(async (range) => {
+                const wage = await computeShiftsPay(range.start, range.end);
+                const commission = await computeCommissions(range.start, range.end);
+                return wage + commission;
+            }));
+
+            recentDays = ranges.map((range, index) => ({ date: dateToStr(range.start), amount: amounts[index] }));
+            renderRecentDays();
+        }
+
+        // builds one bar button. the height is the day's share of the best day in the 7
+        function buildRecentDayBar(day, bestAmount, keepShare)
+        {
+            const shown = day.amount * keepShare;
+            const date = parseLocalDate(day.date);
+
+            const bar = document.createElement('button');
+            bar.type = 'button';
+            bar.className = 'rd-bar';
+            bar.dataset.date = day.date;
+            bar.title = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ': ' + formatMoney(shown);
+
+            if (day.date === todayStr()) bar.classList.add('today');
+            if (day.date === document.getElementById('view-date').value) bar.classList.add('selected');
+            if (day.amount <= 0) bar.classList.add('empty');
+
+            const amount = document.createElement('span');
+            amount.className = 'rd-amount';
+            amount.textContent = shown > 0 ? '$' + Math.round(shown) : '';
+
+            const track = document.createElement('span');
+            track.className = 'rd-track';
+            const fill = document.createElement('span');
+            fill.className = 'rd-fill';
+            fill.style.height = bestAmount > 0 ? Math.max(day.amount / bestAmount * 100, day.amount > 0 ? 6 : 0) + '%' : '0%';
+            track.appendChild(fill);
+
+            const name = document.createElement('span');
+            name.className = 'rd-day';
+            name.textContent = date.toLocaleDateString(undefined, { weekday: 'short' });
+
+            bar.appendChild(amount);
+            bar.appendChild(track);
+            bar.appendChild(name);
+            return bar;
+        }
+
+        function renderRecentDays()
+        {
+            const list = document.getElementById('recent-days');
+            if (!list) return;
+
+            const keepShare = showAfterTax['pay-section'] ? 1 - taxRate / 100 : 1;
+            const bestAmount = Math.max(0, ...recentDays.map(day => day.amount));
+
+            list.innerHTML = '';
+            recentDays.forEach(day => list.appendChild(buildRecentDayBar(day, bestAmount, keepShare)));
+        }
+
+        // a click on a bar changes the "Viewing:" date and presses the View button for the user
+        addListener('recent-days', 'click', (event) => {
+            const bar = event.target.closest('.rd-bar');
+            if (!bar) return;
+
+            document.getElementById('view-date').value = bar.dataset.date;
+            document.getElementById('view-date-btn').click();
+        });
+
+        // ---------- CHART COLORS (dark / light) ----------
+        // the chart draws on a canvas, so the page colors can't reach it. this hands it the right text + grid colors
+        function getChartColors()
+        {
+            const isDark = document.body.classList.contains('dark');
+            return {
+                text: isDark ? '#94a3b8' : '#64748b',
+                grid: isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(100, 116, 139, 0.15)'
+            };
+        }
+
+        function applyChartTheme()
+        {
+            if (!monthlyChart) return;
+            const colors = getChartColors();
+
+            monthlyChart.options.scales.x.ticks.color = colors.text;
+            monthlyChart.options.scales.y.ticks.color = colors.text;
+            monthlyChart.options.scales.y.grid.color = colors.grid;
+            monthlyChart.options.plugins.legend.labels.color = colors.text;
+            monthlyChart.update();
+        }
+
+        document.addEventListener('themechange', applyChartTheme);
 
         // ---------- MONTH TOTALS (COMPARE) ----------
         async function loadMonthCompare() {
@@ -2403,3 +2518,259 @@ function addListener(id, eventName, handler)
                 document.getElementById('job-title-display').textContent = 'Error loading dashboard: ' + err.message;
             }
         })();
+
+
+// ============================================================
+// FINANCE LAYER (top card, count-up numbers, dark / light theme, quick buttons)
+// was dashboard-finance.js. it only watches numbers this file already puts on the page.
+// it sits OUTSIDE the main function above on purpose, and must stay at the bottom
+// ============================================================
+
+// dashboard-finance.js - the "finance app" layer of the dashboard.
+// It never touches the database. It only watches the numbers dashboard.js already puts on the page,
+// then adds the top card, the count-up numbers, the dark / light theme and the quick buttons.
+
+// ---------- HELPERS ----------
+
+// turns "$1,234.50" or "$-5.00" or "0.00" into a number. returns null if the text is not a number
+function parseAmount(text)
+{
+    const cleaned = String(text).replace(/[$,%\s]/g, '');
+    if (cleaned === '' || isNaN(cleaned)) return null;
+    return parseFloat(cleaned);
+}
+
+// one money format for the whole page (shared.js formatMoney): 1234.5 -> "$1,234.50"
+function formatDollars(amount)
+{
+    return formatMoney(amount);
+}
+
+// runs the callback now, and again every time the element's text or class changes
+function watchElement(element, callback)
+{
+    if (!element) return;
+    new MutationObserver(callback).observe(element, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    callback();
+}
+
+// ---------- THEME (dark / light) ----------
+
+function applyTheme(isDark)
+{
+    document.body.classList.toggle('dark', isDark);
+    document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+    document.dispatchEvent(new Event('themechange')); // dashboard.js listens, so the chart can recolor itself
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    const goDark = !document.body.classList.contains('dark');
+    applyTheme(goDark);
+
+    try { localStorage.setItem('theme', goDark ? 'dark' : 'light'); } catch (e) { /* private window, just don't remember it */ }
+});
+
+applyTheme(document.body.classList.contains('dark'));
+
+// ---------- COUNT-UP NUMBERS ----------
+// when a money number changes, it rolls from the old value to the new one instead of jumping.
+// tiny changes (the live timer adds a few cents every second) just show right away so nothing flickers
+
+const COUNT_UP_IDS = [
+    'hero-amount', 'hero-bills', 'hero-gap', 'hero-sched',
+    'summary-hourly-pay', 'summary-commission-pay', 'summary-total-daily',
+    'compare-this-money', 'compare-last-money', 'year-money', 'year-avg-month'
+];
+
+// rolls one number. every roll gets a ticket number, so if a newer number arrives the older roll stops
+function rollNumber(element, from, to)
+{
+    const ticket = (element.__ticket || 0) + 1;
+    element.__ticket = ticket;
+
+    const startTime = performance.now();
+    const duration = 650;
+
+    function frame(now)
+    {
+        if (element.__ticket !== ticket) return; // a newer roll took over
+
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
+        const value = from + (to - from) * eased;
+
+        element.__shown = value;
+        element.__written = formatDollars(value);
+        element.textContent = element.__written; // remembered, so the watcher below knows this write is ours
+        if (progress < 1) requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+}
+
+function handleNumberChange(element)
+{
+    if (element.textContent === element.__written) return; // our own roll wrote this, ignore it
+
+    const target = parseAmount(element.textContent);
+    if (target === null) return;
+
+    const from = element.__shown !== undefined ? element.__shown : 0;
+
+    if (Math.abs(target - from) < 1) {
+        element.__ticket = (element.__ticket || 0) + 1; // stop any roll still running
+        element.__shown = target;
+        return;
+    }
+
+    rollNumber(element, from, target);
+}
+
+COUNT_UP_IDS.forEach(id => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    new MutationObserver(() => handleNumberChange(element)).observe(element, { childList: true, characterData: true, subtree: true });
+});
+
+// ---------- TOP CARD ----------
+
+let heroPeriod = 'month';
+
+try { heroPeriod = localStorage.getItem('heroPeriod') || 'month'; } catch (e) { /* keep month */ }
+
+function getHeroRangeText()
+{
+    const viewDate = document.getElementById('view-date').value;
+    if (!viewDate) return '';
+
+    const date = new Date(viewDate + 'T00:00:00');
+
+    switch (heroPeriod) {
+        case 'day':
+            return 'For ' + date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        case 'week':
+            return 'For the week of ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        case 'month':
+            return 'For ' + date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        default:
+            return 'For ' + date.getFullYear();
+    }
+}
+
+// the green / red arrow compares this month with last month. it only shows on the Month tab
+function renderHeroDelta()
+{
+    const deltaBox = document.getElementById('hero-delta');
+    deltaBox.className = 'hero-delta';
+    deltaBox.textContent = '';
+
+    if (heroPeriod !== 'month') return;
+
+    const thisMonth = parseAmount(document.getElementById('compare-this-money').textContent);
+    const lastMonth = parseAmount(document.getElementById('compare-last-money').textContent);
+    if (thisMonth === null || lastMonth === null || (thisMonth === 0 && lastMonth === 0)) return;
+
+    if (lastMonth === 0) {
+        deltaBox.classList.add('up');
+        deltaBox.textContent = '▲ new this month';
+        return;
+    }
+
+    const percent = (thisMonth - lastMonth) / lastMonth * 100;
+    deltaBox.classList.add(percent >= 0 ? 'up' : 'down');
+    deltaBox.textContent = (percent >= 0 ? '▲ ' : '▼ ') + Math.abs(percent).toFixed(1) + '% vs last month';
+}
+
+function renderHero()
+{
+    const source = document.getElementById('total-' + heroPeriod);
+    const amount = source ? parseAmount(source.textContent) : null;
+    document.getElementById('hero-amount').textContent = amount === null ? '$0.00' : formatDollars(amount);
+    document.getElementById('hero-range').textContent = getHeroRangeText();
+    renderHeroDelta();
+}
+
+function selectHeroPeriod(period)
+{
+    heroPeriod = period;
+
+    document.querySelectorAll('.hero-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.period === period);
+    });
+
+    try { localStorage.setItem('heroPeriod', period); } catch (e) { /* ignore */ }
+    renderHero();
+}
+
+document.querySelectorAll('.hero-tab').forEach(tab => {
+    tab.addEventListener('click', () => selectHeroPeriod(tab.dataset.period));
+});
+
+// clicking a box in Totals also switches the top card to that period
+document.querySelectorAll('.pay-box').forEach((box, index) => {
+    box.classList.add('clickable');
+    box.addEventListener('click', () => {
+        selectHeroPeriod(['day', 'week', 'month', 'year'][index]);
+        document.getElementById('sec-hero').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+});
+
+// the top card follows the numbers in Totals and the month compare boxes
+['total-day', 'total-week', 'total-month', 'total-year', 'compare-this-money', 'compare-last-money'].forEach(id => {
+    watchElement(document.getElementById(id), renderHero);
+});
+
+document.getElementById('view-date').addEventListener('change', renderHero);
+document.getElementById('view-date-btn').addEventListener('click', renderHero);
+
+// ---------- THE THREE SMALL BOXES UNDER THE TOP CARD ----------
+// they copy what the schedule section already worked out, so the answer is visible without scrolling
+
+function copyText(sourceId, targetId)
+{
+    watchElement(document.getElementById(sourceId), () => {
+        document.getElementById(targetId).textContent = document.getElementById(sourceId).textContent;
+    });
+}
+
+copyText('sched-bills-total', 'hero-bills');
+copyText('sched-week-net', 'hero-sched');
+copyText('sched-gap-amount', 'hero-gap');
+copyText('sched-gap-title', 'hero-gap-label');
+
+// the "left over / extra needed" box turns green or red together with the schedule one
+watchElement(document.getElementById('sched-gap-box'), () => {
+    const box = document.getElementById('sched-gap-box');
+    const chip = document.getElementById('hero-gap-chip');
+    chip.classList.toggle('gap-ok', box.classList.contains('gap-ok'));
+    chip.classList.toggle('gap-short', box.classList.contains('gap-short'));
+});
+
+// ---------- QUICK COMMISSION AMOUNTS ----------
+// a quick button fills in the amount, then the Add button wiggles so you know it is the next tap
+
+document.querySelectorAll('.quick-amount').forEach(button => {
+    button.addEventListener('click', () => {
+        document.getElementById('commission-input').value = button.dataset.amount;
+
+        const addButton = document.getElementById('add-commission-btn');
+        addButton.classList.remove('nudge');
+        void addButton.offsetWidth; // restarts the animation if it is tapped twice
+        addButton.classList.add('nudge');
+        addButton.focus();
+    });
+});
+
+// ---------- BUTTON PRESS FEEDBACK ----------
+// every button gets a small "pressed" look while the finger or mouse is down
+
+document.addEventListener('pointerdown', (event) => {
+    const button = event.target.closest('button');
+    if (button && !button.disabled) button.classList.add('pressed');
+});
+
+['pointerup', 'pointercancel', 'pointerleave'].forEach(name => {
+    document.addEventListener(name, () => {
+        document.querySelectorAll('button.pressed').forEach(button => button.classList.remove('pressed'));
+    }, true);
+});
