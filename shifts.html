@@ -7,11 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shift History</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="shifts-styles.css">
+    <link rel="stylesheet" href="shifts-styles.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
+    <script>
+        // first it sets the theme before the page draws, so there is no white flash. dark is the default.
+        // it uses the same saved choice as the dashboard and the budget page, so all pages match
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
     <nav class="main-nav">
         <div class="nav-brand">💰 WageTracker</div>
         <div class="nav-links">
@@ -24,14 +30,46 @@
         </div>
     </nav>
 
-    <main>
-        <header>
-            <h1>Shift History</h1>
-            <p class="subtext">Grouped by two-week pay period. Fix a forgotten clock-in/out, or log a shift you missed entirely.</p>
-        </header>
+    <header class="page-header">
+        <h1>Shift History</h1>
+        <p class="subtext">Grouped by two-week pay period. Fix a forgotten clock-in/out, or log a shift you missed entirely.</p>
+    </header>
 
-        <section class="add-shift-section">
-            <h2>Add a Shift</h2>
+    <div class="jump-bar">
+        <div class="jump-links">
+            <a href="#sec-hero">Summary</a>
+            <a href="#sec-add" id="jump-add">Add a Shift</a>
+            <a href="#sec-periods">Pay Periods</a>
+        </div>
+        <div class="jump-actions">
+            <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
+        </div>
+    </div>
+
+    <main>
+
+        <section class="hero-section" id="sec-hero">
+            <div class="hero-main">
+                <span class="hero-label">Current pay period</span>
+                <p class="hero-amount" id="hero-amount">$0.00</p>
+                <p class="hero-sub"><span id="hero-delta" class="hero-delta"></span><span id="hero-range"></span></p>
+            </div>
+
+            <div class="hero-days">
+                <p class="hero-label">Last 6 pay periods <span class="hero-hint">tap a bar to open that period</span></p>
+                <div id="period-bars" class="period-bars"></div>
+            </div>
+
+            <div class="hero-chips">
+                <div class="hero-chip"><span class="chip-label">Hours this period</span><span class="chip-value" id="hero-hours">0.00</span></div>
+                <div class="hero-chip"><span class="chip-label">Shifts this period</span><span class="chip-value" id="hero-shifts">0</span></div>
+                <div class="hero-chip"><span class="chip-label">Average per hour</span><span class="chip-value" id="hero-average">$0.00</span></div>
+            </div>
+        </section>
+
+        <section class="add-shift-section" id="sec-add">
+            <details data-key="addshift">
+            <summary><h2>Add a Shift</h2></summary>
             <form id="add-shift-form">
                 <label for="add-shift-job">Job:</label>
                 <select id="add-shift-job" required></select>
@@ -50,16 +88,17 @@
                 <p id="add-shift-status" class="form-status"></p>
                 <input type="submit" value="Add Shift">
             </form>
+            </details>
         </section>
 
-        <section class="shift-periods-section">
+        <section class="shift-periods-section" id="sec-periods">
             <h2>Pay Periods</h2>
             <div id="periods-list">Loading...</div>
         </section>
     </main>
 
     <script src="shared.js"></script>
-    <script src="shifts.js?v=2"></script>
+    <script src="shifts.js?v=3"></script>
 </body>
 
 </html>
