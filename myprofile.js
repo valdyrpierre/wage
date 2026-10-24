@@ -1,29 +1,13 @@
-// ============================================================
-// SUPABASE SETUP
-// ============================================================
-// TODO: replace with your actual Supabase project values
-// (Project Settings > API in your Supabase dashboard)
+
 const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ============================================================
-// GLOBAL STATE
-// ============================================================
-// These hold data we fetch once and reuse across multiple functions,
-// so we don't have to re-query Supabase every time we need it.
+
 let currentUser = null; // the logged-in user's Supabase auth object (id, email, metadata, etc.)
 let userJobs = [];      // array of this user's rows from the "jobs" table
 
-// NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
-// getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
-// all now live in shared.js (loaded before this file), so this page's
-// "Income This Month" figure always agrees with dashboard.js, budget.js,
-// and shifts.js — they all use the exact same functions now.
 
-// ============================================================
-// INIT — runs once when the page loads
-// ============================================================
 async function init() {
     // Check if someone is actually logged in. If not, bounce them to the login page —
     // this page should never be visible to a logged-out visitor.
@@ -38,16 +22,22 @@ async function init() {
     await loadJobsForEditing();
 }
 
-// ============================================================
 // PROFILE INFO DISPLAY (top section of the page)
-// ============================================================
 async function loadProfileInfo() {
-    // Supabase doesn't have a built-in "name" field on the user object,
-    // so we store/read it from user_metadata instead (a flexible JSON
     // field Supabase provides for exactly this kind of custom data).
     const name = currentUser.user_metadata?.full_name || '(not set)';
-    document.getElementById('profile-name').textContent = 'Name: ' + name;
-    document.getElementById('profile-email').textContent = 'Email: ' + currentUser.email;
+    document.getElementById('profile-name').textContent = name;
+    document.getElementById('profile-email').textContent = currentUser.email;
+    document.getElementById('profile-avatar').textContent = (currentUser.user_metadata?.full_name || currentUser.email).trim().charAt(0).toUpperCase();
+
+    // pay period start + member since, shown in the small boxes of the top card
+    const payStart = currentUser.user_metadata?.pay_period_start;
+    document.getElementById('hero-pay-start').textContent = payStart
+        ? new Date(payStart + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Not set';
+    document.getElementById('hero-member').textContent = currentUser.created_at
+        ? new Date(currentUser.created_at).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+        : '—';
 
     // Pre-fill the "Update Info" form below with the user's current values,
     // so they're editing their existing info rather than starting from blank fields.
@@ -66,24 +56,19 @@ async function loadProfileInfo() {
     const titleText = userJobs.length > 0
         ? userJobs.map(j => j.job_title).join(', ') // e.g. "Cashier, Server"
         : '(no jobs added yet)';
-    document.getElementById('profile-job-title').textContent = 'Job Title(s): ' + titleText;
+    document.getElementById('profile-job-title').textContent = titleText;
+    document.getElementById('hero-jobs').textContent = userJobs.length;
 
     const income = await computeIncomeThisMonth();
-    document.getElementById('profile-income').textContent = 'Income This Month: ' + formatMoney(income);
+    document.getElementById('hero-amount').textContent = formatMoney(income);
+    document.getElementById('hero-range').textContent = 'For ' + new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) + ' (wages + commission)';
 }
 
-// Calculates total income (wages + commission) for the current calendar month.
-// This is the same calculation used on the budget page, so the numbers agree
-// everywhere in the app.
 async function computeIncomeThisMonth() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    // We fetch starting from the Sunday that begins monthStart's week (not from
-    // monthStart itself). Why? Because if the 1st of the month falls in the
-    // middle of a week, we need that week's earlier shifts too, in order to
-    // correctly calculate whether later shifts in that same week hit overtime.
     const fetchFrom = getWeekStartDate(monthStart);
 
     const { data: shifts } = await supabaseClient
@@ -94,16 +79,11 @@ async function computeIncomeThisMonth() {
         .gte('clock_in', fetchFrom.toISOString())
         .lt('clock_in', monthEnd.toISOString());
 
-    // Fetch any logged lunch breaks for these shifts (unpaid, so they're
-    // subtracted from each shift's hours), then run every shift through the
-    // overtime calculator so each shift's pay reflects whether it pushed the
-    // user over 40 hrs/week for its job.
+   
     const breaksByShiftId = await fetchBreaksByShiftId((shifts || []).map(s => s.id));
     const shiftPayMap = computeShiftPayWithOvertime(shifts || [], breaksByShiftId);
 
-    // Now sum up ONLY the shifts that actually fall within this calendar month
-    // (remember: we fetched a few extra "before the month started" shifts above,
-    // purely to get the overtime math right — we don't want to count their pay here).
+    
     let wageTotal = 0;
     (shifts || []).forEach(s => {
         const clockIn = new Date(s.clock_in);
@@ -125,9 +105,7 @@ async function computeIncomeThisMonth() {
     return wageTotal + commissionTotal;
 }
 
-// ============================================================
 // UPDATE NAME / EMAIL / PASSWORD
-// ============================================================
 document.getElementById('update-form').addEventListener('submit', async (e) => {
     e.preventDefault(); // stop the browser's default "reload the page" form behavior
     const statusEl = document.getElementById('update-status');
@@ -137,9 +115,7 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
     const email = document.getElementById('update-email').value.trim();
     const password = document.getElementById('update-password').value;
     const payPeriodStart = document.getElementById('update-pay-period-start').value; // "YYYY-MM-DD" or empty
-
-    // ---- validation before contacting Supabase ----
-
+    
     // a name with no space means there is no last name, and the dashboard needs both
     if (name && !name.includes(' ')) {
         statusEl.textContent = 'Please enter your first AND last name (example: Valdyr Pierre).';
@@ -189,14 +165,12 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
     // so the rest of the page reflects the change immediately.
     currentUser = data.user;
     statusEl.textContent = 'Saved!';
-    statusEl.style.color = '#0f766e'; // teal (matches the site's success color)
+    statusEl.style.color = '#10b981'; // emerald (readable on the dark and the light theme)
     document.getElementById('update-password').value = ''; // clear the password field for security
     await loadProfileInfo(); // re-render the top section with the new info
 });
 
-// ============================================================
 // EDIT / DELETE JOBS
-// ============================================================
 // Populates the "Select a job" dropdown with the user's jobs, and wires it up
 // so picking a different job loads that job's info into the edit form below.
 async function loadJobsForEditing() {
@@ -288,7 +262,7 @@ document.getElementById('job-edit-form').addEventListener('submit', async (e) =>
     }
 
     statusEl.textContent = 'Job updated!';
-    statusEl.style.color = '#0f766e';
+    statusEl.style.color = '#10b981';
     // Refresh both the top profile summary (job title list, income) and the
     // dropdown/edit form, since the job's info just changed.
     await loadProfileInfo();
@@ -317,11 +291,7 @@ document.getElementById('delete-job-btn').addEventListener('click', async () => 
     await loadJobsForEditing();
 });
 
-// ============================================================
 // LOGOUT
-// ============================================================
-// Both the nav bar's logout button and the one down in the Danger Zone
-// section do the exact same thing — just two convenient places to reach it.
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut(); // clears the local session/token
     window.location.href = 'login.html';
@@ -332,13 +302,10 @@ document.getElementById('nav-logout-btn').addEventListener('click', async () => 
     window.location.href = 'login.html';
 });
 
-// ============================================================
 // DELETE ACCOUNT (wipes the user's data, then signs them out)
 // ============================================================
 // Note: this does NOT delete the actual login credentials (email/password)
-// from Supabase's auth system — that requires a privileged "service role"
-// API call that can't safely run in browser-side JavaScript. This button
-// removes everything the user actually see/use in the app, and logs them out.
+// from Supabase's auth system — that requires a privileged "service role".
 document.getElementById('delete-account-btn').addEventListener('click', async () => {
     // Two separate confirmations, since this is destructive and irreversible.
     const firstConfirm = confirm('This will permanently delete all your jobs, shifts, commissions, and bills. Continue?');
@@ -359,6 +326,103 @@ document.getElementById('delete-account-btn').addEventListener('click', async ()
     alert('Your data has been deleted and you have been logged out.');
     window.location.href = 'login.html';
 });
+
+
+// the jump bar sticks right under the top menu, so it needs to know how tall that menu is
+function setNavHeight() {
+    const nav = document.querySelector('.main-nav');
+    if (nav) document.documentElement.style.setProperty('--nav-h', nav.offsetHeight + 'px');
+}
+
+setNavHeight();
+window.addEventListener('resize', setNavHeight);
+
+// ---------- THEME (dark / light) ----------
+function applyTheme(isDark) {
+    document.body.classList.toggle('dark', isDark);
+    document.getElementById('theme-toggle').textContent = isDark ? '☀️' : '🌙';
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    const goDark = !document.body.classList.contains('dark');
+    applyTheme(goDark);
+
+    try { localStorage.setItem('theme', goDark ? 'dark' : 'light'); } catch (e) { /* private window, just don't remember it */ }
+});
+
+applyTheme(document.body.classList.contains('dark'));
+
+// ---------- COLLAPSIBLE SECTIONS ----------
+// each <details data-key="..."> remembers if it was left open or closed
+document.querySelectorAll('details[data-key]').forEach(box => {
+    try {
+        const saved = localStorage.getItem('open-profile-' + box.dataset.key);
+        if (saved === 'yes') box.open = true;
+        if (saved === 'no') box.open = false;
+    } catch (e) { /* keep the default */ }
+
+    box.addEventListener('toggle', () => {
+        try { localStorage.setItem('open-profile-' + box.dataset.key, box.open ? 'yes' : 'no'); } catch (e) { /* ignore */ }
+    });
+});
+
+// ---------- SHOW / HIDE PASSWORD ----------
+document.getElementById('toggle-password').addEventListener('click', () => {
+    const input = document.getElementById('update-password');
+    const nowVisible = input.type === 'password';
+    input.type = nowVisible ? 'text' : 'password';
+    document.getElementById('toggle-password').textContent = nowVisible ? 'Hide' : 'Show';
+});
+
+// ---------- COUNT-UP NUMBER ----------
+// when the income changes it rolls from the old value to the new one instead of jumping
+function parseMoneyText(text) {
+    const cleaned = String(text).replace(/[$,%\s]/g, '');
+    if (cleaned === '' || isNaN(cleaned)) return null;
+    return parseFloat(cleaned);
+}
+
+// every roll gets a ticket number, so if a newer number arrives the older roll stops
+function rollMoney(element, from, to) {
+    const ticket = (element.__ticket || 0) + 1;
+    element.__ticket = ticket;
+    const startTime = performance.now();
+
+    function frame(now) {
+        if (element.__ticket !== ticket) return;
+
+        const progress = Math.min((now - startTime) / 650, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
+        const value = from + (to - from) * eased;
+
+        element.__shown = value;
+        element.__written = formatMoney(value);
+        element.textContent = element.__written; // remembered, so the watcher knows this write is ours
+        if (progress < 1) requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+}
+
+function handleMoneyChange(element) {
+    if (element.textContent === element.__written) return; // our own roll wrote this
+
+    const target = parseMoneyText(element.textContent);
+    if (target === null) return;
+
+    const from = element.__shown !== undefined ? element.__shown : 0;
+
+    if (Math.abs(target - from) < 1) {
+        element.__ticket = (element.__ticket || 0) + 1;
+        element.__shown = target;
+        return;
+    }
+
+    rollMoney(element, from, target);
+}
+
+const heroAmount = document.getElementById('hero-amount');
+new MutationObserver(() => handleMoneyChange(heroAmount)).observe(heroAmount, { childList: true, characterData: true, subtree: true });
 
 // Kick everything off once the script loads.
 init();
