@@ -1,4 +1,4 @@
-/* userinfo-styles.css - User Info Page */
+/* userinfo-styles.css - My Jobs page. Same finance look as the dashboard, budget and shifts pages. */
 
 * {
     margin: 0;
@@ -8,44 +8,252 @@
 
 body {
     font-family: 'Segoe UI', Arial, sans-serif;
-    background: linear-gradient(135deg, #0f766e, #134e4a);
+    background: #eef2f5;
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 16px;
+    color: #0f172a;
 }
 
 main {
-    background: #ffffff;
-    border-radius: 20px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-    padding: 56px 48px;
-    width: 100%;
-    max-width: 640px;
-}
-
-header {
-    text-align: center;
-    margin-bottom: 36px;
-}
-
-header h1 {
-    color: #0f766e;
-    font-size: 2.6rem;
-    font-weight: 800;
-    margin-bottom: 12px;
-    letter-spacing: -0.5px;
-}
-
-.subtext {
-    color: #64748b;
-    font-size: 1.05rem;
-    line-height: 1.6;
-    max-width: 480px;
+    max-width: 1200px;
     margin: 0 auto;
+    padding: 34px 20px 60px;
+    display: grid;
+    gap: 22px;
 }
 
+section {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 28px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+h2 {
+    font-size: 1.2rem;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+.hint {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 14px;
+}
+
+.hero-amount, .chip-value, .job-wage, .rd-amount { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ---------- HEADER + JUMP BAR (same as the dashboard) ---------- */
+.page-header {
+    background: linear-gradient(120deg, #0f766e, #0d9488, #134e4a, #0f766e);
+    background-size: 300% 300%;
+    animation: gradientShift 12s ease infinite;
+    color: #fff;
+    padding: 26px 40px;
+    box-shadow: 0 4px 20px rgba(15, 118, 110, 0.35);
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.page-header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.3px; }
+.subtext { font-size: 0.95rem; opacity: 0.9; margin-top: 4px; }
+
+.jump-bar {
+    position: sticky;
+    top: var(--nav-h, 56px);
+    z-index: 90;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.jump-links { display: flex; gap: 6px; overflow-x: auto; }
+
+.jump-links a {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f766e;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.jump-links a:hover { background: #ccfbf1; }
+.jump-actions { display: flex; align-items: center; gap: 8px; }
+
+.theme-toggle {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #cbd5e1;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+html { scroll-behavior: smooth; }
+main > section { scroll-margin-top: calc(var(--nav-h, 56px) + 60px); }
+
+/* ---------- TOP CARD ---------- */
+.hero-section {
+    display: grid;
+    gap: 22px;
+    grid-template-columns: 1.1fr 1fr;
+    grid-template-areas:
+        "main days"
+        "chips chips";
+    color: #e2e8f0;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.hero-main  { grid-area: main; }
+.hero-days  { grid-area: days; }
+.hero-chips { grid-area: chips; }
+
+.hero-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.hero-hint { font-weight: 500; letter-spacing: 0; text-transform: none; color: #64748b; margin-left: 6px; }
+
+.hero-amount {
+    margin-top: 14px;
+    font-size: clamp(2.6rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    color: #f8fafc;
+}
+
+.hero-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; font-size: 0.9rem; color: #94a3b8; }
+.hero-delta:empty { display: none; }
+.hero-delta { padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+.hero-delta.up { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+
+/* one bar per job */
+.job-bars {
+    display: flex;
+    gap: 10px;
+    height: 150px;
+    margin-top: 12px;
+}
+
+.rd-bar {
+    flex: 1;
+    max-width: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+}
+
+.rd-amount { height: 14px; font-size: 0.68rem; font-weight: 700; color: #cbd5e1; }
+.rd-track { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 8px; background: rgba(148, 163, 184, 0.1); overflow: hidden; }
+.rd-fill { width: 100%; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #34d399, #059669); transition: height 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.2s ease; }
+.rd-bar:hover .rd-fill { filter: brightness(1.25); }
+.rd-bar:hover .rd-track { background: rgba(148, 163, 184, 0.2); }
+.rd-day { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.72rem; font-weight: 700; }
+
+.hero-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+
+.hero-chip {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.hero-chip:hover { transform: translateY(-2px); background: rgba(148, 163, 184, 0.14); }
+.chip-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #94a3b8; }
+.chip-value { font-size: 1.35rem; font-weight: 800; color: #f1f5f9; }
+
+@media (max-width: 860px) {
+    .hero-section { grid-template-columns: 1fr; grid-template-areas: "main" "days" "chips"; }
+}
+
+/* ---------- YOUR JOBS LIST ---------- */
+.jobs-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    color: #64748b;
+}
+
+.job-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #10b981;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.job-card:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12); }
+
+.job-badge {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.job-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.job-company { font-weight: 800; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-title-line { font-size: 0.85rem; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.job-wage {
+    flex: none;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.14);
+    color: #047857;
+    font-size: 0.9rem;
+    font-weight: 800;
+}
+
+.job-card.flash { animation: cardFlash 1.2s ease; }
+
+@keyframes cardFlash {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    30% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.45); }
+}
+
+/* ---------- ADD A JOB FORM ---------- */
 form {
     display: flex;
     flex-direction: column;
@@ -55,51 +263,49 @@ form {
     border: 2px solid #e2e8f0;
     background: #f8fafc;
     border-radius: 16px;
-    padding: 28px;
-    margin-bottom: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
     display: flex;
     flex-direction: column;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .job-entry:focus-within {
-    border-color: #0f766e;
-    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
-    background: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
 }
 
 label {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
-    color: #1e293b;
+    color: #334155;
     margin-bottom: 8px;
-    margin-top: 18px;
+    margin-top: 16px;
 }
 
-label:first-of-type {
-    margin-top: 0;
-}
+label:first-of-type { margin-top: 0; }
 
 input[type="text"],
 input[type="number"] {
-    padding: 16px 18px;
+    padding: 12px 14px;
     border: 2px solid #cbd5e1;
     border-radius: 12px;
-    font-size: 1.15rem;
+    font-size: 1rem;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
     background: #ffffff;
+    color: #0f172a;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 input[type="text"]:focus,
 input[type="number"]:focus {
-    border-color: #0f766e;
-    box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.15);
+    border-color: #10b981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
 }
 
-.autocomplete-wrapper {
-    position: relative;
-}
+.autocomplete-wrapper { position: relative; }
+
+.autocomplete-wrapper input { width: 100%; }
 
 .autocomplete-list {
     display: none;
@@ -108,7 +314,7 @@ input[type="number"]:focus {
     left: 0;
     right: 0;
     background: #ffffff;
-    border: 2px solid #0f766e;
+    border: 2px solid #10b981;
     border-radius: 12px;
     max-height: 220px;
     overflow-y: auto;
@@ -117,60 +323,119 @@ input[type="number"]:focus {
 }
 
 .autocomplete-item {
-    padding: 12px 16px;
-    font-size: 1.05rem;
+    padding: 11px 16px;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: background 0.15s ease;
 }
 
-.autocomplete-item:hover {
-    background: #f0fdfa;
-    color: #0f766e;
-}
-
-.autocomplete-item:not(:last-child) {
-    border-bottom: 1px solid #f1f5f9;
-}
+.autocomplete-item:hover { background: #ecfdf5; color: #047857; }
+.autocomplete-item:not(:last-child) { border-bottom: 1px solid #f1f5f9; }
 
 #add_job_additional_button {
     background: transparent;
-    color: #0f766e;
-    border: 2px dashed #0f766e;
-    padding: 16px;
+    color: #059669;
+    border: 2px dashed #10b981;
+    padding: 14px;
     border-radius: 12px;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
-#add_job_additional_button:hover {
-    background: #0f766e;
-    color: #fff;
-    transform: translateY(-2px);
-}
+#add_job_additional_button:hover { background: #10b981; color: #04130d; transform: translateY(-2px); }
 
 input[type="submit"] {
-    margin-top: 28px;
-    background: linear-gradient(135deg, #14b8a6, #0f766e);
+    margin-top: 22px;
+    background: linear-gradient(135deg, #10b981, #047857);
     color: #fff;
     border: none;
-    padding: 18px;
-    border-radius: 14px;
-    font-size: 1.25rem;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 1.05rem;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 8px 20px rgba(15, 118, 110, 0.35);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, filter 0.2s ease;
 }
 
-input[type="submit"]:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 26px rgba(15, 118, 110, 0.45);
+input[type="submit"]:hover { filter: brightness(1.08); transform: translateY(-2px); }
+button:active, input[type="submit"]:active { transform: scale(0.97); }
+
+#error-msg, #success-msg { font-size: 0.9rem; margin-top: 10px; }
+#error-msg { color: #dc2626; }
+#success-msg { color: #059669; }
+
+/* on a phone the top menu wraps into a tall block, so only the jump bar stays stuck to the top */
+@media (max-width: 640px) {
+    .main-nav { position: static; }
+    .jump-bar { top: 0; }
+    main > section { scroll-margin-top: 60px; }
+    .page-header { padding: 22px 20px; }
+    section { padding: 22px; }
+    .jobs-list { grid-template-columns: 1fr; }
 }
 
-#error-msg,
-#success-msg {
-    font-size: 1rem;
-    text-align: center;
+/* ============================================================
+   DARK THEME (body.dark)
+   ============================================================ */
+
+body.dark { background: #060b16; color: #e2e8f0; }
+
+body.dark .page-header {
+    background: linear-gradient(120deg, #052e2b, #064e3b, #0b1220, #052e2b);
+    background-size: 300% 300%;
+    box-shadow: 0 4px 20px rgba(2, 6, 23, 0.5);
 }
+
+body.dark section {
+    background: #0e1626;
+    border: 1px solid #1b2a44;
+    box-shadow: 0 6px 18px rgba(2, 6, 23, 0.35);
+}
+
+body.dark .hero-section {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.28), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.18), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    border-color: rgba(148, 163, 184, 0.15);
+}
+
+body.dark h2,
+body.dark .job-company { color: #f1f5f9; }
+
+body.dark .jobs-list,
+body.dark .job-title-line,
+body.dark .hint { color: #8ea0b8; }
+
+body.dark .jump-bar { background: rgba(8, 13, 26, 0.92); border-bottom-color: #1b2a44; }
+body.dark .jump-links a { color: #34d399; }
+body.dark .jump-links a:hover { background: rgba(16, 185, 129, 0.14); }
+body.dark .theme-toggle { border-color: #26344f; }
+
+body.dark .job-card { background: #0a1222; border-color: #1e2d49; border-left-color: #10b981; }
+body.dark .job-card:hover { box-shadow: 0 10px 22px rgba(2, 6, 23, 0.5); }
+body.dark .job-wage { background: rgba(16, 185, 129, 0.18); color: #34d399; }
+
+body.dark .job-entry { background: #0a1222; border-color: #1e2d49; }
+body.dark label { color: #cbd5e1; }
+
+body.dark input[type="text"],
+body.dark input[type="number"] {
+    background: #0e1626;
+    color: #e2e8f0;
+    border-color: #26344f;
+    color-scheme: dark;
+}
+
+body.dark input::placeholder { color: #5b6b85; }
+
+body.dark .autocomplete-list { background: #0e1626; border-color: #10b981; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); }
+body.dark .autocomplete-item { color: #e2e8f0; }
+body.dark .autocomplete-item:hover { background: #0b2a25; color: #34d399; }
+body.dark .autocomplete-item:not(:last-child) { border-bottom-color: #1b2a44; }
+
+body.dark #add_job_additional_button { color: #34d399; }
+body.dark #error-msg { color: #f87171; }
+body.dark #success-msg { color: #34d399; }
