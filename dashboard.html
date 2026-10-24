@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
     <link rel="stylesheet" href="nav-styles.css">
-    <link rel="stylesheet" href="dashboard-styles.css?v=6">
+    <link rel="stylesheet" href="dashboard-styles.css?v=8">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
+    <script>
+        // first it sets the theme before the page draws, so there is no white flash. dark is the default
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
 
     <nav class="main-nav">
         <div class="nav-brand">💰 WageTracker</div>
@@ -53,10 +58,40 @@
             <a href="#sec-history">History</a>
             <a href="#sec-goal">Goal</a>
         </div>
+        <div class="jump-actions">
+        <button id="theme-toggle" type="button" class="theme-toggle" title="Switch between dark and light">☀️</button>
         <button id="tax-toggle-all" type="button" class="tax-toggle-all" title="Switch every amount on this page between before and after tax">Showing before tax</button>
+        </div>
     </div>
 
     <main>
+
+        <section class="hero-section" id="sec-hero">
+            <div class="hero-main">
+                <div class="hero-top">
+                    <span class="hero-label">Earnings</span>
+                    <div class="hero-tabs" role="tablist">
+                        <button type="button" class="hero-tab" data-period="day">Day</button>
+                        <button type="button" class="hero-tab" data-period="week">Week</button>
+                        <button type="button" class="hero-tab active" data-period="month">Month</button>
+                        <button type="button" class="hero-tab" data-period="year">Year</button>
+                    </div>
+                </div>
+                <p class="hero-amount" id="hero-amount">$0.00</p>
+                <p class="hero-sub"><span id="hero-delta" class="hero-delta"></span><span id="hero-range"></span></p>
+            </div>
+
+            <div class="hero-days">
+                <p class="hero-label">Last 7 days <span class="hero-hint">tap a bar to view that day</span></p>
+                <div id="recent-days" class="recent-days"></div>
+            </div>
+
+            <div class="hero-chips">
+                <div class="hero-chip"><span class="chip-label">Bills due this month</span><span class="chip-value" id="hero-bills">$0.00</span></div>
+                <div class="hero-chip" id="hero-gap-chip"><span class="chip-label" id="hero-gap-label">Left over this month</span><span class="chip-value" id="hero-gap">$0.00</span></div>
+                <div class="hero-chip"><span class="chip-label">Scheduled this week (after tax)</span><span class="chip-value" id="hero-sched">$0.00</span></div>
+            </div>
+        </section>
 
         <section class="clock-section" id="sec-today">
             <button id="clock-in">Clock In</button>
@@ -90,6 +125,11 @@
                     <input type="number" id="commission-input" step="0.01" min="0" placeholder="0.00">
                 </div>
                 <button id="add-commission-btn">Add Commission</button>
+            </div>
+            <div class="quick-amounts">
+                <span>Quick amounts:</span>
+                <button type="button" class="quick-amount" data-amount="5">+ $5 repair</button>
+                <button type="button" class="quick-amount" data-amount="35">+ $35 signup</button>
             </div>
             <p id="commission-status"></p>
 
@@ -312,7 +352,7 @@
 
     </main>
 
-    <script src="shared.js?v=20"></script>
-    <script src="dashboard.js?v=21"></script>
+    <script src="shared.js?v=21"></script>
+    <script src="dashboard.js?v=23"></script>
 </body>
 </html>
