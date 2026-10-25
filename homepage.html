@@ -4,14 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WageTracker — Know exactly what you earn</title>
-    <link rel="stylesheet" href="homepage-styles.css">
+    <link rel="stylesheet" href="homepage-styles.css?v=2">
 </head>
 <body>
+    <script>
+        // dark is the default, the same saved choice as every other page
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
 
     <header class="site-header">
         <div class="site-header-inner">
             <div class="brand">💰 WageTracker</div>
             <nav class="header-nav">
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch dark and light theme"></button>
                 <a href="login.html" class="nav-btn nav-btn-ghost">Log In</a>
                 <a href="create_account.html" class="nav-btn nav-btn-solid">Create Account</a>
             </nav>
@@ -95,7 +101,7 @@
                         you hit overtime, and can tell instantly whether a paycheck looks right.
                     </p>
                 </div>
-                <img class="why-image" src="homepage.jpg" alt="Desk with a laptop, notebook, and financial charts showing income breakdowns">
+                <img class="why-image" src="images/desk-finance.jpg" alt="Desk with a laptop, notebook, and financial charts showing income breakdowns">
             </div>
         </section>
 
@@ -368,6 +374,20 @@
                     detailBox.classList.add('filled');
                 });
             });
+        })();
+
+        // ============================================================
+        // THEME BUTTON
+        // ============================================================
+        (function () {
+            const button = document.getElementById('theme-toggle');
+            function paint() { button.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙'; }
+            button.addEventListener('click', () => {
+                const isDark = document.body.classList.toggle('dark');
+                try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (e) { }
+                paint();
+            });
+            paint();
         })();
 
         // ============================================================
