@@ -1,14 +1,34 @@
-
+// ============================================================
+// SUPABASE SETUP
+// ============================================================
+// TODO: replace with your actual Supabase project values
 const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ============================================================
+// GLOBAL STATE
+// ============================================================
 let currentUser = null;
 let userJobs = [];
 let allShifts = []; // every shift belonging to the user, refreshed after every change
-let periodStats = new Map();
-let periodsRenderedOnce = false; 
+let periodStats = new Map(); // pay period start (timestamp) -> { total, hours, shiftCount }, used by the top card and the bars
+let openPeriodKeys = new Set(); // the pay periods left open, so editing a shift does not close them
+let periodsRenderedOnce = false; // the first time, the current and the newest period start open
 
+// NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
+// getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
+// all now live in shared.js (loaded before this file), so the pay shown
+// here always agrees with dashboard.js, budget.js, and myprofile.js.
+
+// ============================================================
+// BIWEEKLY PAY PERIOD HELPERS
+// ============================================================
+// PERIOD_ANCHOR determines where pay period boundaries fall. It's set in
+// init() from the "Pay Period Start Date" saved on the Profile page (stored
+// in Supabase user_metadata), so periods line up with the person's actual
+// pay schedule. If they haven't set one yet, we fall back to an arbitrary
+// reference date and show a hint pointing them to the Profile page.
 let PERIOD_ANCHOR = new Date(2024, 0, 7); // fallback reference date until we know the real one
 let usingFallbackAnchor = true;
 
@@ -34,7 +54,9 @@ function formatDateRange(start, end) {
     return start.toLocaleDateString(undefined, opts) + ' – ' + lastDay.toLocaleDateString(undefined, opts);
 }
 
-
+// ============================================================
+// INIT
+// ============================================================
 async function init() {
     const { data: { user }, error } = await supabaseClient.auth.getUser();
     if (error || !user) {
@@ -121,7 +143,9 @@ async function loadJobs() {
     });
 }
 
-
+// ============================================================
+// LOAD + GROUP SHIFTS
+// ============================================================
 async function loadShifts() {
     const { data, error } = await supabaseClient
         .from('shifts')
@@ -239,8 +263,11 @@ function getNetHours(shift, breaksByShiftId) {
     return Math.max(0, rawHours - breakHours);
 }
 
-
+// ============================================================
 // TOP CARD + LAST 6 PAY PERIODS BARS
+// ============================================================
+// first it finds the current pay period and the one before it, then it fills the big number,
+// the "last period" note and the three small boxes, then it draws the bars
 function renderPeriodSummary() {
     const currentStart = getPayPeriodStart(new Date());
     const currentEnd = new Date(currentStart);
@@ -472,8 +499,9 @@ async function deleteShift(shiftId) {
     await loadShifts();
 }
 
-
+// ============================================================
 // ADD A SHIFT MANUALLY (covers "forgot to clock in entirely")
+// ============================================================
 document.getElementById('add-shift-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const statusEl = document.getElementById('add-shift-status');
@@ -524,12 +552,18 @@ document.getElementById('add-shift-form').addEventListener('submit', async (e) =
     await loadShifts();
 });
 
-
+// ============================================================
 // NAV LOGOUT
+// ============================================================
 document.getElementById('nav-logout-btn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
     window.location.href = 'login.html';
 });
+
+// ============================================================
+// FINANCE LAYER (dark / light theme, count-up numbers, sticky bar)
+// same look as the dashboard and the budget page
+// ============================================================
 
 // the jump bar sticks right under the top menu, so it needs to know how tall that menu is
 function setNavHeight() {
@@ -621,4 +655,10 @@ function handleMoneyChange(element) {
     new MutationObserver(() => handleMoneyChange(element)).observe(element, { childList: true, characterData: true, subtree: true });
 });
 
-init();
+// if anything inside init breaks, say what it was on the page instead of leaving "Loading..." forever
+window.addEventListener('error', e => { const l = document.getElementById('periods-list'); if (l && l.textContent === 'Loading...') l.textContent = 'Page error: ' + e.message; });
+init().catch(error => {
+    console.error('Shifts page failed to load:', error);
+    const list = document.getElementById('periods-list');
+    if (list) list.textContent = 'Could not load shifts: ' + (error && error.message ? error.message : error);
+});
