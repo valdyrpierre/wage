@@ -131,7 +131,10 @@
         const session = data && data.session;
         if (!session) throw new Error('Please log in first.');
 
-        const response = await fetch(FUNCTION_URL, {
+        let response;
+        try
+        {
+            response = await fetch(FUNCTION_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -144,6 +147,11 @@
                 tzOffset: new Date().getTimezoneOffset()
             })
         });
+        }
+        catch (networkError)
+        {
+            throw new Error("Couldn't reach the assistant. Check that the finance-assistant function is deployed with 'Verify JWT' turned off, and that you're on valdyrpierre.github.io.");
+        }
 
         let body = {};
         try { body = await response.json(); } catch (e) { }
