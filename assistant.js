@@ -53,6 +53,7 @@
 
     function renderRich(container, text)
     {
+        text = String(text || '');
         let list = null;
         text.split('\n').forEach(line =>
         {
@@ -153,9 +154,14 @@
             throw new Error("Couldn't reach the assistant. Check that the finance-assistant function is deployed with 'Verify JWT' turned off, and that you're on valdyrpierre.github.io.");
         }
 
+        const rawText = await response.text();
         let body = {};
-        try { body = await response.json(); } catch (e) { }
-        if (!response.ok) throw new Error(body.error || 'Something went wrong (' + response.status + ').');
+        try { body = JSON.parse(rawText); } catch (e) { }
+        if (!response.ok) throw new Error(body.error || body.message || body.msg || ('Server said ' + response.status + ': ' + rawText.slice(0, 200)));
+        if (typeof body.reply !== 'string' || body.reply === '')
+        {
+            throw new Error('The assistant sent back something unexpected: ' + rawText.slice(0, 200));
+        }
         return body.reply;
     }
 
