@@ -790,3 +790,80 @@ body {
         font-size: 0.85rem;
     }
 }
+
+/* ============================================================
+   FINANCE LOOK (matches the dashboard): dark by default, light when body has no .dark
+   ============================================================ */
+
+body.dark { background: #060b16; color: #e2e8f0; }
+
+.theme-toggle { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #cbd5e1; background: transparent; color: inherit; font-size: 1rem; cursor: pointer; align-self: center; }
+.theme-toggle:hover { border-color: #10b981; }
+.header-nav { align-items: center; }
+
+/* header */
+.brand, body.dark .brand { color: #10b981; }
+.nav-btn-ghost { color: #0f766e; border-color: #10b981; }
+.nav-btn-solid { background: linear-gradient(135deg, #10b981, #0f766e); border-color: transparent; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); }
+body.dark .site-header { background: rgba(6, 11, 22, 0.88); border-bottom-color: #1e293b; }
+body.dark .nav-btn-ghost { color: #34d399; }
+body.dark .nav-btn-ghost:hover { background: rgba(16, 185, 129, 0.12); }
+body.dark .theme-toggle { border-color: #26344f; }
+
+/* hero */
+.hero { background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.35), transparent 45%),
+        radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.22), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33);
+    background-size: auto; animation: none; }
+.hero h1 span { color: #34d399; }
+.cta-primary { background: linear-gradient(135deg, #10b981, #0f766e); color: #fff; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4); }
+.cta-primary:hover { transform: translateY(-2px); }
+.cta-secondary { border-color: rgba(255, 255, 255, 0.35); }
+
+/* sections on dark */
+body.dark .demo-section,
+body.dark .why-section,
+body.dark .features-section,
+body.dark .how-it-works-section,
+body.dark .faq-section { background: transparent; color: #e2e8f0; }
+body.dark h2, body.dark h3 { color: #f1f5f9; }
+body.dark .demo-intro, body.dark .features-intro, body.dark .why-text,
+body.dark .feature-card p, body.dark .step-card p, body.dark .faq-answer p, body.dark .demo-disclaimer { color: #94a3b8; }
+
+/* cards */
+body.dark .demo-card,
+body.dark .feature-card,
+body.dark .step-card,
+body.dark .faq-item,
+body.dark .feature-detail-box { background: #0e1626; border-color: #26344f; color: #e2e8f0; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+body.dark .feature-card:hover, body.dark .feature-card.active { border-color: #10b981; box-shadow: 0 8px 26px rgba(16, 185, 129, 0.25); }
+body.dark .feature-detail-box.filled { background: #0b2a24; border-color: #10b981; color: #d1fae5; }
+body.dark .step-number { background: linear-gradient(135deg, #10b981, #0f766e); color: #fff; }
+
+/* demo widget */
+body.dark .demo-display { background: linear-gradient(160deg, #0b1220, #0f1d33); border-color: #26344f; }
+body.dark .demo-big-number { color: #34d399; }
+body.dark .demo-label, body.dark .demo-breakdown, body.dark .demo-overtime-note { color: #94a3b8; }
+body.dark .demo-overtime-note.over, body.dark .demo-label.demo-live { color: #fbbf24; }
+body.dark .demo-overtime-bar-track { background: #1e293b; }
+.demo-overtime-bar-fill { background: linear-gradient(90deg, #10b981, #34d399); }
+.demo-overtime-bar-fill.over { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+body.dark .demo-field label { color: #94a3b8; }
+body.dark .demo-input-wrap { background: #0b1220; border-color: #26344f; color: #e2e8f0; }
+body.dark .demo-input-wrap input { background: transparent; color: #e2e8f0; }
+body.dark .demo-chip-btn, body.dark .demo-btn-ghost { background: transparent; color: #34d399; border-color: #10b981; }
+body.dark .demo-btn-stop { background: transparent; color: #f87171; border-color: #f87171; }
+body.dark .demo-btn:disabled { opacity: 0.45; }
+
+/* faq */
+body.dark .faq-question { background: transparent; color: #e2e8f0; }
+body.dark .faq-caret { color: #34d399; }
+
+/* closing call to action + footer */
+.final-cta-section { background:
+        radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.32), transparent 45%),
+        linear-gradient(160deg, #0b1220, #0f1d33); background-size: auto; animation: none; color: #fff; }
+.floating-cta { background: linear-gradient(135deg, #10b981, #0f766e); }
+body.dark .site-footer { background: #060b16; color: #64748b; border-top: 1px solid #1e293b; }
+body.dark .why-image { border: 1px solid #26344f; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
