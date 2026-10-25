@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="nav-styles.css">
     <link rel="stylesheet" href="userinfo-styles.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="assistant.css?v=1">
 </head>
 
 <body>
@@ -70,7 +71,7 @@
         <section class="jobs-section" id="sec-jobs">
             <h2>Your Jobs</h2>
             <div id="jobs-list" class="jobs-list">Loading...</div>
-            <p class="hint">To change a company or job title, use Edit on the Dashboard. To change a wage, use your Profile.</p>
+            <p class="hint">To change a job's company, title or wage, use Edit Jobs on your Profile.</p>
         </section>
 
         <section class="add-job-section" id="sec-add">
@@ -104,6 +105,7 @@
     </main>
 
     <script>
+        // TODO: replace with your actual Supabase project values
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 
@@ -527,6 +529,7 @@
             window.location.href = 'dashboard.html';
         });
     </script>
+    <script src="assistant.js?v=1"></script>
 </body>
 
 </html>
