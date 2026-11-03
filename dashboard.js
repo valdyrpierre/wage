@@ -31,6 +31,7 @@ function addListener(id, eventName, handler)
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.supabaseClient = supabaseClient; // the assistant widget reads the login from this
 
         let currentUser = null;
         let userJob = null;
@@ -1143,6 +1144,7 @@ function addListener(id, eventName, handler)
             await loadDailySummaryForDate(document.getElementById('view-date').value || todayStr());
 
             loadRecentDays().catch(error => console.warn('last 7 days failed:', error.message));
+            updateScheduleCommission().catch(error => console.warn('commission for the bills comparison failed:', error.message)); // commission changes the left over
         }
 
         // first it will take the saved totals for each period, then if a shift is running
@@ -1777,6 +1779,7 @@ function addListener(id, eventName, handler)
         let scheduledShifts = [];     // the scheduled shifts around the week on screen (the month for the estimate too)
         let scheduleWeekStart = null; // the Sunday of the week on screen
         let scheduleBills = [];       // the bills due in the month the estimate is for (null if they could not be loaded)
+        let scheduleCommission = 0;   // the commission logged in that same month (before tax). commission is not scheduled, so it is added on top of the scheduled shifts
         const MAX_COPY_WEEKS = 12;
         let editingShiftId = null;    // the id of the scheduled shift being edited (null = the form adds a new shift)
         let toastTimer = null;        // the timer that hides the small message at the bottom of the schedule
@@ -1909,6 +1912,32 @@ function addListener(id, eventName, handler)
                 return null;
             }
             return data || [];
+        }
+
+        // Adds up the commission logged in the month, before tax. Returns 0 if it could not be loaded.
+        async function obtainMonthCommission(monthStart, monthEnd)
+        {
+            const { data, error } = await supabaseClient
+                .from('commissions')
+                .select('amount')
+                .eq('user_id', currentUser.userId)
+                .gte('entry_date', dateToStr(monthStart))
+                .lt('entry_date', dateToStr(monthEnd));
+
+            if (error) {
+                console.error('Could not load the commission for the schedule:', error);
+                return 0;
+            }
+            return (data || []).reduce((sum, row) => sum + parseFloat(row.amount), 0);
+        }
+
+        // Called after commission is added, changed or deleted: reloads the month's commission and redraws the bills comparison.
+        async function updateScheduleCommission()
+        {
+            if (!scheduleWeekStart) return; // the schedule is not on screen yet
+            const month = getScheduleMonthRange();
+            scheduleCommission = await obtainMonthCommission(month.start, month.end);
+            renderScheduleSummary();
         }
 
         // ---------- ESTIMATE ----------
@@ -2056,6 +2085,7 @@ function addListener(id, eventName, handler)
 
             scheduledShifts = shifts;
             scheduleBills = await obtainMonthBills(month.start, month.end);
+            scheduleCommission = await obtainMonthCommission(month.start, month.end);
             renderSchedule();
         }
 
@@ -2167,7 +2197,8 @@ function addListener(id, eventName, handler)
             document.getElementById('sched-month-net').textContent = formatMoney(monthTotals.pay * keepShare);
 
             // the bills are paid from the money after tax, so the comparison uses the after tax number
-            renderBillsGap(monthTotals.pay * keepShare, month);
+            // commission is real money earned this month but it is not in the scheduled shifts, so it is added here
+            renderBillsGap((monthTotals.pay + scheduleCommission) * keepShare, month, scheduleCommission * keepShare);
         }
 
         // How many weeks are in the month: the days of the month divided by 7 (31 days = 4.43 weeks).
@@ -2179,10 +2210,10 @@ function addListener(id, eventName, handler)
 
         // Compares the bills of the month with the expected take-home of the scheduled shifts, week by week:
         // - the bills of the month divided by the weeks of the month = what must be earned each week
-        // - the take-home of the scheduled shifts divided by the weeks = what the schedule brings in each week
+        // - the take-home of the scheduled shifts plus the commission logged this month, divided by the weeks = what comes in each week
         // If the schedule brings in less, it shows how much more is needed per week. If it brings in
         // more, it shows how much money would be left over for the month after paying all the bills.
-        function renderBillsGap(expectedTakeHome, month)
+        function renderBillsGap(expectedTakeHome, month, commissionTakeHome)
         {
             const monthName = month.start.toLocaleDateString(undefined, { month: 'long' });
             const box = document.getElementById('sched-gap-box');
@@ -2209,7 +2240,7 @@ function addListener(id, eventName, handler)
             document.getElementById('sched-need-week').textContent = formatMoney(neededPerWeek);
             document.getElementById('sched-have-week').textContent = formatMoney(scheduledPerWeek);
 
-            const startOfDetail = `${monthName} has ${weeksText}. Your ${formatMoney(billsTotal)} of bills divided by ${weeksText} means you need to earn ${formatMoney(neededPerWeek)} each week. Your scheduled shifts bring in about ${formatMoney(scheduledPerWeek)} a week after tax`;
+            const startOfDetail = `${monthName} has ${weeksText}. Your ${formatMoney(billsTotal)} of bills divided by ${weeksText} means you need to earn ${formatMoney(neededPerWeek)} each week. Your scheduled shifts${commissionTakeHome > 0 ? ' plus ' + formatMoney(commissionTakeHome) + ' of commission' : ''} bring in about ${formatMoney(scheduledPerWeek)} a week after tax`;
 
             if (scheduledPerWeek >= neededPerWeek) {
                 const leftOver = expectedTakeHome - billsTotal;
