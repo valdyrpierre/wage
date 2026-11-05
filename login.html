@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log in | WageTracker</title>
+    <link rel="stylesheet" href="login-styles.css?v=2">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <script>
+        // dark is the default, the same saved choice as every other page
+        try { if (localStorage.getItem('theme') !== 'light') document.body.classList.add('dark'); }
+        catch (e) { document.body.classList.add('dark'); }
+    </script>
+    <main>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch dark and light theme"></button>
+        <a class="auth-brand" href="homepage.html">💰 WageTracker</a>
+        <header>
+            <h1>Welcome back</h1>
+            <p class="auth-sub">Log in to see your earnings.</p>
+        </header>
+
+        <form id="login-form">
+            <label for="username">Email:</label>
+            <input type="email" id="username" name="username" required>
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <p id="error-msg" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
+
+            <input type="submit" value="Login">
+            <input type="button" value="Create Account" onclick="window.location.href='createaccount.html'">
+        </form>
+
+        <footer>
+            <p>A personal project built for learning. <a href="homepage.html">Back to home</a></p>
+        </footer>
+    </main>
+
+    <script>
+        // theme button: switches dark and light and remembers it
+        (function () {
+            const button = document.getElementById('theme-toggle');
+            function paint() { button.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙'; }
+            button.addEventListener('click', () => {
+                const isDark = document.body.classList.toggle('dark');
+                try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (e) { }
+                paint();
+            });
+            paint();
+        })();
+    </script>
+    <script>
+        // TODO: replace with your actual Supabase project values
+        // Found in Supabase dashboard: Project Settings > API
+        const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const form = document.getElementById('login-form');
+        const errorMsg = document.getElementById('error-msg');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMsg.textContent = '';
+
+            const email = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            // basic validation before ever contacting Supabase — catches
+            // empty/whitespace-only input that "required" alone can miss
+            if (!email || !password) {
+                errorMsg.textContent = 'Please enter both your email and password.';
+                return;
+            }
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+
+            if (error) {
+                errorMsg.textContent = error.message;
+                return;
+            }
+
+            // login succeeded — redirect to the dashboard/tracker page
+            window.location.href = 'dashboard.html';
+        });
+    </script>
+</body>
+
+</html>
