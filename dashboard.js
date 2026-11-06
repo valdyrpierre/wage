@@ -35,29 +35,25 @@ function addListener(id, eventName, handler)
 
         let currentUser = null;
         let userJob = null;
-        let userJobs = []; // every job the user has (one per company)
-        let shiftsErrorShown = false; // so the "could not load shifts" pop up only shows once, not every second
+        let userJobs = []; 
+        let shiftsErrorShown = false; 
         let selectedJobId = null;
-        let activeShift = null; // { id, job_id, clock_in }
-        let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
-        let liveTimerInterval = null;
-        let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
-        let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
-        let todayBase = null; // what the user already earned TODAY from finished shifts and commission, across ALL jobs (null when viewing another date)
-        let minutesBeforeThisShift = 0; // minutes already worked this week at the same company, before the running shift started
-        let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
-        let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
-        let summaryBase = null; // the Daily Summary's saved wage + commission for its date, plus the date range, so the live timer can add the running shift on top
+        let activeShift = null; 
+        let activeBreak = null; 
+        let totalsBase = {}; 
+        let totalsRanges = {}; 
+        let todayBase = null; 
+        let minutesBeforeThisShift = 0;
+        let liveShiftWage = 0;
+        let taxRate = 5; 
+        let summaryBase = null; 
         let recentDays = []; // the last 7 days for the bars in the top card: { date, amount }
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
         const MONTHS_BACK = 6;          // how many months of history to show
         let employment = null;          // employment info for the current user, if any
-        // NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
-        // getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
-        // all now live in shared.js (loaded before this file) so every page
-        // uses the exact same overtime/break logic.
+        
 
         function obtainCurrentUserInfo( firstname, lastname, email, userId ) 
         {
@@ -581,10 +577,6 @@ function addListener(id, eventName, handler)
             if (shouldRefresh) await refreshTotals();
         }
 
-        // ============================================================
-        // TODAY'S LUNCH BREAKS — list, edit, delete
-        // ============================================================
-
         // Fetches every break logged against a shift that started today,
         // for the current user, and renders them as editable rows.
         async function loadTodaysBreaks() {
@@ -661,8 +653,8 @@ function addListener(id, eventName, handler)
         function renderBreakEditMode(row, breakEntry) {
             row.innerHTML = `
                 <span class="break-edit-fields">
-                    <label>Start: <input type="datetime-local" class="edit-break-start" name="break_start" value="${toDatetimeLocalValue(breakEntry.break_start)}"></label>
-                    <label>End: <input type="datetime-local" class="edit-break-end" name="break_end" value="${toDatetimeLocalValue(breakEntry.break_end)}"></label>
+                    <label>Start: <input type="datetime-local" class="edit-break-start" value="${toDatetimeLocalValue(breakEntry.break_start)}"></label>
+                    <label>End: <input type="datetime-local" class="edit-break-end" value="${toDatetimeLocalValue(breakEntry.break_end)}"></label>
                 </span>
                 <span class="break-actions">
                     <button type="button" class="save-break-btn">Save</button>
@@ -795,89 +787,65 @@ function addListener(id, eventName, handler)
                 : 0;
 
             let tickCount = 0;
-            let lastTickError = '';
-
-            // one second of the live counter. a problem is shown under the clock buttons instead of leaving $0.00 with no reason
-            async function runLiveTick()
-            {
-                try {
-                    // every 15 seconds we ask the database if this shift was changed on another page
-                    // (for example the clock-in time edited on the Shifts page) and pick up the change
-                    tickCount++;
-                    if (tickCount % 15 === 0) {
-                        await syncActiveShiftWithDatabase();
-                    }
-                    if (!activeShift) return; // the sync found the shift was clocked out or deleted
-
-                    if (!(wage > 0)) {
-                        document.getElementById('clock-status').textContent = 'This job has no hourly wage, so the live counter stays at $0.00. Set one on the My Jobs page.';
-                    }
-
-                    const now = new Date();
-                    const clockInTime = new Date(activeShift.clock_in);
-
-                    // fetch this shift's breaks fresh each tick — cheap query, and
-                    // keeps the live counter accurate the instant lunch starts/ends
-                    const { data: breaksForShift } = await supabaseClient
-                        .from('breaks')
-                        .select('break_start, break_end')
-                        .eq('shift_id', activeShift.id);
-
-                    const breakMs = getBreakMsSoFar(breaksForShift || []);
-                    const rawElapsedMinutes = (now - clockInTime) / (1000 * 60);
-                    const elapsedMinutes = Math.max(0, rawElapsedMinutes - (breakMs / (1000 * 60))); // lunch time doesn't count toward pay
-
-                    // a clock-in time that is still in the future can't earn anything yet, so we say why the counter is at $0.00
-                    if (rawElapsedMinutes < 0) {
-                        document.getElementById('clock-status').textContent = 'Clock-in time is in the future. Fix it on the Shifts page.';
-                    }
-
-                    // live tracker = minute wage × minutes worked, with the overtime
-                    // bump applied to whichever minutes push the week past 40 hours
-                    // (2400 minutes) for this job
-                    const OVERTIME_WEEKLY_THRESHOLD_MINUTES = OVERTIME_WEEKLY_THRESHOLD * 60;
-                    const regularMinutes = Math.max(0, Math.min(elapsedMinutes, OVERTIME_WEEKLY_THRESHOLD_MINUTES - minutesBeforeThisShift));
-                    const overtimeMinutes = elapsedMinutes - regularMinutes;
-                    const wagePay = (regularMinutes * minuteWage) + (overtimeMinutes * minuteWage * OVERTIME_MULTIPLIER);
-
-                    liveShiftWage = wagePay; // lets the Day / Week / Month / Year totals follow the running shift
-                    renderTotals();
-
-                    // live tracker = everything already earned today at every job (finished shifts + all commission)
-                    // + what the running shift has earned so far
-                    const earnedBeforeWage = todayBase ? todayBase.wage : 0;
-                    const earnedBeforeCommission = todayBase ? todayBase.commission : 0;
-                    const pay = earnedBeforeWage + wagePay + earnedBeforeCommission;
-
-                    // the small line under the big number follows along too
-                    const breakdownLine = document.getElementById('day-breakdown');
-                    if (todayBase && breakdownLine) {
-                        breakdownLine.textContent = `Wages: ${formatMoney(earnedBeforeWage + wagePay)} • Commission: ${formatMoney(earnedBeforeCommission)}`;
-                    }
-
-                    const payDisplay = document.getElementById('live-pay');
-                    // if the user chose "Show After Tax" we keep (100 - tax%) of the pay, otherwise we keep all of it
-                    const keepShare = showAfterTax['constantpay'] ? 1 - taxRate / 100 : 1;
-                    payDisplay.textContent = formatMoney(pay * keepShare);
-                    payDisplay.classList.remove('tick');
-                    void payDisplay.offsetWidth; // restart animation
-                    payDisplay.classList.add('tick');
-
-                    if (lastTickError) {
-                        document.getElementById('clock-status').textContent = 'Clocked in since ' + clockInTime.toLocaleTimeString();
-                        lastTickError = '';
-                    }
-                } catch (error) {
-                    console.error('Live counter tick failed:', error);
-                    if (error.message !== lastTickError) {
-                        lastTickError = error.message;
-                        document.getElementById('clock-status').textContent = 'Live counter problem: ' + error.message;
-                    }
+            liveTimerInterval = setInterval(async () => {
+                // every 15 seconds we ask the database if this shift was changed on another page
+                // (for example the clock-in time edited on the Shifts page) and pick up the change
+                tickCount++;
+                if (tickCount % 15 === 0) {
+                    await syncActiveShiftWithDatabase();
                 }
-            }
+                if (!activeShift) return; // the sync found the shift was clocked out or deleted
 
-            runLiveTick(); // the first number shows right away, not after one second
-            liveTimerInterval = setInterval(runLiveTick, 1000);
+                const now = new Date();
+                const clockInTime = new Date(activeShift.clock_in);
+
+                // fetch this shift's breaks fresh each tick — cheap query, and
+                // keeps the live counter accurate the instant lunch starts/ends
+                const { data: breaksForShift } = await supabaseClient
+                    .from('breaks')
+                    .select('break_start, break_end')
+                    .eq('shift_id', activeShift.id);
+
+                const breakMs = getBreakMsSoFar(breaksForShift || []);
+                const rawElapsedMinutes = (now - clockInTime) / (1000 * 60);
+                const elapsedMinutes = Math.max(0, rawElapsedMinutes - (breakMs / (1000 * 60))); // lunch time doesn't count toward pay
+
+                // a clock-in time that is still in the future can't earn anything yet, so we say why the counter is at $0.00
+                if (rawElapsedMinutes < 0) {
+                    document.getElementById('clock-status').textContent = 'Clock-in time is in the future. Fix it on the Shifts page.';
+                }
+
+                // live tracker = minute wage × minutes worked, with the overtime
+                // bump applied to whichever minutes push the week past 40 hours
+                // (2400 minutes) for this job
+                const OVERTIME_WEEKLY_THRESHOLD_MINUTES = OVERTIME_WEEKLY_THRESHOLD * 60;
+                const regularMinutes = Math.max(0, Math.min(elapsedMinutes, OVERTIME_WEEKLY_THRESHOLD_MINUTES - minutesBeforeThisShift));
+                const overtimeMinutes = elapsedMinutes - regularMinutes;
+                const wagePay = (regularMinutes * minuteWage) + (overtimeMinutes * minuteWage * OVERTIME_MULTIPLIER);
+
+                liveShiftWage = wagePay; // lets the Day / Week / Month / Year totals follow the running shift
+                renderTotals();
+
+                // live tracker = everything already earned today at every job (finished shifts + all commission)
+                // + what the running shift has earned so far
+                const earnedBeforeWage = todayBase ? todayBase.wage : 0;
+                const earnedBeforeCommission = todayBase ? todayBase.commission : 0;
+                const pay = earnedBeforeWage + wagePay + earnedBeforeCommission;
+
+                // the small line under the big number follows along too
+                const breakdownLine = document.getElementById('day-breakdown');
+                if (todayBase && breakdownLine) {
+                    breakdownLine.textContent = `Wages: ${formatMoney(earnedBeforeWage + wagePay)} • Commission: ${formatMoney(earnedBeforeCommission)}`;
+                }
+
+                const payDisplay = document.getElementById('live-pay');
+                // if the user chose "Show After Tax" we keep (100 - tax%) of the pay, otherwise we keep all of it
+                const keepShare = showAfterTax['constantpay'] ? 1 - taxRate / 100 : 1;
+                payDisplay.textContent = formatMoney(pay * keepShare);
+                payDisplay.classList.remove('tick');
+                void payDisplay.offsetWidth; // restart animation
+                payDisplay.classList.add('tick');
+            }, 1000);
         }
 
         // ---------- COMMISSION ----------
@@ -985,7 +953,7 @@ function addListener(id, eventName, handler)
             const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
                 <span class="commission-job">${jobTitle}</span>
-                <input type="number" class="edit-commission-amount" name="amount" step="0.01" min="0.01" value="${entry.amount}">
+                <input type="number" class="edit-commission-amount" step="0.01" min="0.01" value="${entry.amount}">
                 <span class="commission-actions">
                     <button type="button" class="save-commission-btn">Save</button>
                     <button type="button" class="cancel-commission-btn">Cancel</button>
@@ -1522,16 +1490,6 @@ function addListener(id, eventName, handler)
             window.location.href = 'login.html';
         });
 
-        // ============================================================
-        // WORK + COMMISSION TRACKER
-        // (added to match valdyrpierre.github.io/budget/homepage.html)
-        // ============================================================
-        // Design notes:
-        // - phones_repaired / insurance_signups / total_customers /
-        //   five_star_reviews are stored in the "daily_metrics" table. there is
-        //   no Daily Entry form on this page anymore, so nothing adds to that
-        //   table from here. the Month Totals and the 5-Star Rate only read it.
-        // - the $5 per repair and $35 per signup rates below are still used by
         //   the Save Goal Planner to show how many repairs or signups are needed.
 
         const PHONE_REPAIR_RATE = 5;
@@ -1797,9 +1755,7 @@ function addListener(id, eventName, handler)
             document.getElementById('goal-signups-needed').textContent = Math.ceil(needed / INSURANCE_SIGNUP_RATE);
         }
 
-        // ============================================================
-        // WEEKLY SCHEDULE — the shifts the user is scheduled to work: week view, copy the week, estimate
-        // ============================================================
+      
         let scheduledShifts = [];     // the scheduled shifts around the week on screen (the month for the estimate too)
         let scheduleWeekStart = null; // the Sunday of the week on screen
         let scheduleBills = [];       // the bills due in the month the estimate is for (null if they could not be loaded)
@@ -2423,8 +2379,6 @@ function addListener(id, eventName, handler)
             await loadSchedule();
         });
 
-        // ---------- DELETE ----------
-
         // Deletes one scheduled shift right away and shows an Undo button for a few seconds
         // (undo puts the same shift back), so there is no "are you sure" box to click through.
         async function handleDeleteScheduledShift(shift)
@@ -2577,13 +2531,6 @@ function addListener(id, eventName, handler)
             }
         })();
 
-
-// ============================================================
-// FINANCE LAYER (top card, count-up numbers, dark / light theme, quick buttons)
-// was dashboard-finance.js. it only watches numbers this file already puts on the page.
-// it sits OUTSIDE the main function above on purpose, and must stay at the bottom
-// ============================================================
-
 // dashboard-finance.js - the "finance app" layer of the dashboard.
 // It never touches the database. It only watches the numbers dashboard.js already puts on the page,
 // then adds the top card, the count-up numbers, the dark / light theme and the quick buttons.
@@ -2653,7 +2600,7 @@ function rollNumber(element, from, to)
     {
         if (element.__ticket !== ticket) return; // a newer roll took over
 
-        const progress = Math.max(0, Math.min((now - startTime) / duration, 1));
+        const progress = Math.min((now - startTime) / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
         const value = from + (to - from) * eased;
 
