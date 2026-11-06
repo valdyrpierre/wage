@@ -689,6 +689,9 @@ function addListener(id, eventName, handler)
                 case endDate && endDate <= startDate:
                     statusEl.textContent = 'End time must be after start time.';
                     return;
+                case endDate && endDate - startDate > 4 * 60 * 60 * 1000:
+                    statusEl.textContent = 'A break longer than 4 hours looks like a wrong date. Check the day of both times.';
+                    return;
             }
 
             const { error } = await supabaseClient
@@ -725,12 +728,13 @@ function addListener(id, eventName, handler)
 
         // sums completed break minutes for a shift, plus any currently-ongoing
         // break, so the live pay counter can exclude unpaid lunch time
-        function getBreakMsSoFar(breaksForShift) {
+        function getBreakMsSoFar(breaksForShift, clockIn) {
             const now = new Date();
             return breaksForShift.reduce((totalMs, b) => {
-                const start = new Date(b.break_start);
-                const end = b.break_end ? new Date(b.break_end) : now; // still-open break counts up to now
-                return totalMs + (end - start);
+                // a break can only take time from the shift itself, so it is cut to the window clock-in .. now
+                const start = new Date(Math.max(new Date(b.break_start), clockIn));
+                const end = new Date(Math.min(b.break_end ? new Date(b.break_end) : now, now)); // still-open break counts up to now
+                return totalMs + Math.max(0, end - start);
             }, 0);
         }
 
@@ -823,7 +827,7 @@ function addListener(id, eventName, handler)
                         .select('break_start, break_end')
                         .eq('shift_id', activeShift.id);
 
-                    const breakMs = getBreakMsSoFar(breaksForShift || []);
+                    const breakMs = getBreakMsSoFar(breaksForShift || [], clockInTime);
                     const rawElapsedMinutes = (now - clockInTime) / (1000 * 60);
                     const elapsedMinutes = Math.max(0, rawElapsedMinutes - (breakMs / (1000 * 60))); // lunch time doesn't count toward pay
 
@@ -871,7 +875,7 @@ function addListener(id, eventName, handler)
                         dbg.style.cssText = 'font-size:12px;opacity:.7;margin:4px 0';
                         document.getElementById('clock-status').after(dbg);
                     }
-                    dbg.textContent = `check v28 | wage ${wage}/hr | worked ${elapsedMinutes.toFixed(1)} min | breaks ${(breakMs / 60000).toFixed(1)} min | pay ${wagePay.toFixed(2)} | today ${earnedBeforeWage.toFixed(2)}`;
+                    dbg.textContent = `check v29 | wage ${wage}/hr | worked ${elapsedMinutes.toFixed(1)} min | breaks ${(breakMs / 60000).toFixed(1)} min | pay ${wagePay.toFixed(2)} | today ${earnedBeforeWage.toFixed(2)}`;
 
                     if (lastTickError) {
                         document.getElementById('clock-status').textContent = 'Clocked in since ' + clockInTime.toLocaleTimeString();
