@@ -291,7 +291,7 @@
 
         const form = make('form', 'fa-form');
         els.input = make('input', 'fa-input');
-        els.input.type = 'text'; els.input.maxLength = 1000;
+        els.input.type = 'text'; els.input.maxLength = 1000; els.input.id = 'fa-question'; els.input.name = 'question'; els.input.autocomplete = 'off';
         els.input.placeholder = 'Ask about your money...';
         els.input.setAttribute('aria-label', 'Your question');
         els.send = make('button', 'fa-send', 'Send');
