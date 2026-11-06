@@ -35,25 +35,29 @@ function addListener(id, eventName, handler)
 
         let currentUser = null;
         let userJob = null;
-        let userJobs = []; 
-        let shiftsErrorShown = false; 
+        let userJobs = []; // every job the user has (one per company)
+        let shiftsErrorShown = false; // so the "could not load shifts" pop up only shows once, not every second
         let selectedJobId = null;
-        let activeShift = null; 
-        let activeBreak = null; 
-        let totalsBase = {}; 
-        let totalsRanges = {}; 
-        let todayBase = null; 
-        let minutesBeforeThisShift = 0;
-        let liveShiftWage = 0;
-        let taxRate = 5; 
-        let summaryBase = null; 
+        let activeShift = null; // { id, job_id, clock_in }
+        let activeBreak = null; // { id, break_start } — the currently-open lunch break, if any
+        let liveTimerInterval = null;
+        let totalsBase = {}; // before-tax totals from finished shifts + commission, for each period (day/week/month/year)
+        let totalsRanges = {}; // start and end dates of each period, so we know which ones the active shift falls inside
+        let todayBase = null; // what the user already earned TODAY from finished shifts and commission, across ALL jobs (null when viewing another date)
+        let minutesBeforeThisShift = 0; // minutes already worked this week at the same company, before the running shift started
+        let liveShiftWage = 0; // wage the active shift has earned so far, updated every second by the live timer
+        let taxRate = 5; // the % the user types in the tax box. when "Show After Tax" is on, this % is taken out of the amount. starts at 5 (the Massachusetts rate)
+        let summaryBase = null; // the Daily Summary's saved wage + commission for its date, plus the date range, so the live timer can add the running shift on top
         let recentDays = []; // the last 7 days for the bars in the top card: { date, amount }
         let showAfterTax = { "constantpay": false, "pay-section": false, "income-monthly-graph": false };
         let todaysCommissionByJob = {}; // job_id -> total commission logged today
         let monthlyChart = null;        // Chart.js instance, kept so we can update instead of recreate
         const MONTHS_BACK = 6;          // how many months of history to show
         let employment = null;          // employment info for the current user, if any
-        
+        // NOTE: formatMoney, OVERTIME_WEEKLY_THRESHOLD, OVERTIME_MULTIPLIER,
+        // getWeekStartDate, computeShiftPayWithOvertime, and fetchBreaksByShiftId
+        // all now live in shared.js (loaded before this file) so every page
+        // uses the exact same overtime/break logic.
 
         function obtainCurrentUserInfo( firstname, lastname, email, userId ) 
         {
@@ -576,6 +580,10 @@ function addListener(id, eventName, handler)
             await loadTodaysBreaks();
             if (shouldRefresh) await refreshTotals();
         }
+
+        // ============================================================
+        // TODAY'S LUNCH BREAKS — list, edit, delete
+        // ============================================================
 
         // Fetches every break logged against a shift that started today,
         // for the current user, and renders them as editable rows.
@@ -1490,6 +1498,16 @@ function addListener(id, eventName, handler)
             window.location.href = 'login.html';
         });
 
+        // ============================================================
+        // WORK + COMMISSION TRACKER
+        // (added to match valdyrpierre.github.io/budget/homepage.html)
+        // ============================================================
+        // Design notes:
+        // - phones_repaired / insurance_signups / total_customers /
+        //   five_star_reviews are stored in the "daily_metrics" table. there is
+        //   no Daily Entry form on this page anymore, so nothing adds to that
+        //   table from here. the Month Totals and the 5-Star Rate only read it.
+        // - the $5 per repair and $35 per signup rates below are still used by
         //   the Save Goal Planner to show how many repairs or signups are needed.
 
         const PHONE_REPAIR_RATE = 5;
@@ -1755,7 +1773,9 @@ function addListener(id, eventName, handler)
             document.getElementById('goal-signups-needed').textContent = Math.ceil(needed / INSURANCE_SIGNUP_RATE);
         }
 
-      
+        // ============================================================
+        // WEEKLY SCHEDULE — the shifts the user is scheduled to work: week view, copy the week, estimate
+        // ============================================================
         let scheduledShifts = [];     // the scheduled shifts around the week on screen (the month for the estimate too)
         let scheduleWeekStart = null; // the Sunday of the week on screen
         let scheduleBills = [];       // the bills due in the month the estimate is for (null if they could not be loaded)
@@ -2379,6 +2399,8 @@ function addListener(id, eventName, handler)
             await loadSchedule();
         });
 
+        // ---------- DELETE ----------
+
         // Deletes one scheduled shift right away and shows an Undo button for a few seconds
         // (undo puts the same shift back), so there is no "are you sure" box to click through.
         async function handleDeleteScheduledShift(shift)
@@ -2530,6 +2552,13 @@ function addListener(id, eventName, handler)
                 document.getElementById('job-title-display').textContent = 'Error loading dashboard: ' + err.message;
             }
         })();
+
+
+// ============================================================
+// FINANCE LAYER (top card, count-up numbers, dark / light theme, quick buttons)
+// was dashboard-finance.js. it only watches numbers this file already puts on the page.
+// it sits OUTSIDE the main function above on purpose, and must stay at the bottom
+// ============================================================
 
 // dashboard-finance.js - the "finance app" layer of the dashboard.
 // It never touches the database. It only watches the numbers dashboard.js already puts on the page,
