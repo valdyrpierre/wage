@@ -661,8 +661,8 @@ function addListener(id, eventName, handler)
         function renderBreakEditMode(row, breakEntry) {
             row.innerHTML = `
                 <span class="break-edit-fields">
-                    <label>Start: <input type="datetime-local" class="edit-break-start" value="${toDatetimeLocalValue(breakEntry.break_start)}"></label>
-                    <label>End: <input type="datetime-local" class="edit-break-end" value="${toDatetimeLocalValue(breakEntry.break_end)}"></label>
+                    <label>Start: <input type="datetime-local" class="edit-break-start" name="break_start" value="${toDatetimeLocalValue(breakEntry.break_start)}"></label>
+                    <label>End: <input type="datetime-local" class="edit-break-end" name="break_end" value="${toDatetimeLocalValue(breakEntry.break_end)}"></label>
                 </span>
                 <span class="break-actions">
                     <button type="button" class="save-break-btn">Save</button>
@@ -985,7 +985,7 @@ function addListener(id, eventName, handler)
             const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
                 <span class="commission-job">${jobTitle}</span>
-                <input type="number" class="edit-commission-amount" step="0.01" min="0.01" value="${entry.amount}">
+                <input type="number" class="edit-commission-amount" name="amount" step="0.01" min="0.01" value="${entry.amount}">
                 <span class="commission-actions">
                     <button type="button" class="save-commission-btn">Save</button>
                     <button type="button" class="cancel-commission-btn">Cancel</button>
