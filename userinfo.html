@@ -104,6 +104,7 @@
         </section>
     </main>
 
+    <script src="shared.js?v=3"></script>
     <script>
         // TODO: replace with your actual Supabase project values
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
@@ -387,7 +388,7 @@
             function frame(now) {
                 if (element.__ticket !== ticket) return;
 
-                const progress = Math.min((now - startTime) / 650, 1);
+                const progress = Math.max(0, Math.min((now - startTime) / 650, 1));
                 const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
                 const value = from + (to - from) * eased;
 
@@ -495,6 +496,11 @@
                     return;
                 }
 
+                if (company.length > 100 || title.length > 100) {
+                    errorMsg.textContent = `Job #${entryNumber}: company and job title must each be 100 characters or less.`;
+                    return;
+                }
+
                 if (isNaN(wage) || wage <= 0) {
                     errorMsg.textContent = `Job #${entryNumber} (${title}): hourly wage must be a number greater than 0.`;
                     return;
@@ -529,7 +535,7 @@
             window.location.href = 'dashboard.html';
         });
     </script>
-    <script src="assistant.js?v=1"></script>
+    <script src="assistant.js?v=2"></script>
 </body>
 
 </html>
