@@ -141,3 +141,107 @@ async function fetchBreaksByShiftId(shiftIds) {
     });
     return map;
 }
+
+
+// ============================================================
+// AUTO-LOGOUT AFTER INACTIVITY
+// ============================================================
+// Protects a shared or stolen device: if nobody touches the page for 30 minutes, the user is signed out.
+// A warning banner appears 2 minutes before. Activity in ANY open tab keeps all tabs signed in,
+// because the last-activity time is kept in localStorage. Real clock time is checked (not a long
+// timer), so a laptop that slept for an hour signs out the moment it wakes up.
+(function () {
+    const IDLE_LIMIT_MS = 30 * 60 * 1000;
+    const WARNING_MS = 2 * 60 * 1000; // warn this long before the limit
+    const STORAGE_KEY = 'lastActivity';
+    let banner = null;
+    let signingOut = false;
+
+    function getClient() {
+        if (window.supabaseClient) return window.supabaseClient;
+        return typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    }
+
+    let memoryLastActivity = 0; // this tab's own record, used when localStorage is blocked
+    function storedActivity() {
+        try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; }
+        catch (e) { return 0; }
+    }
+
+    function markActivity() {
+        memoryLastActivity = Date.now();
+        try { localStorage.setItem(STORAGE_KEY, String(memoryLastActivity)); } catch (e) { /* private window */ }
+        hideBanner();
+    }
+
+    function lastActivity() {
+        return Math.max(storedActivity(), memoryLastActivity);
+    }
+
+    function showBanner(secondsLeft) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.setAttribute('role', 'alert');
+            banner.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;'
+                + 'background:#7c2d12;color:#fff;padding:12px 20px;border-radius:10px;font:600 14px system-ui,sans-serif;'
+                + 'box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100vw - 32px);text-align:center';
+            document.body.appendChild(banner);
+        }
+        const minutes = Math.floor(secondsLeft / 60);
+        const seconds = String(secondsLeft % 60).padStart(2, '0');
+        banner.textContent = 'You will be signed out in ' + minutes + ':' + seconds + ' because of inactivity. Move your mouse or press a key to stay signed in.';
+    }
+
+    function hideBanner() {
+        if (banner) { banner.remove(); banner = null; }
+    }
+
+    async function signOutForInactivity() {
+        if (signingOut) return;
+        signingOut = true;
+        const client = getClient();
+        try { if (client) await client.auth.signOut(); } catch (e) { /* leave anyway */ }
+        try { sessionStorage.removeItem('assistantChat'); sessionStorage.removeItem('assistantOpen'); } catch (e) { }
+        window.location.href = 'login.html?timeout=1';
+    }
+
+    function check() {
+        if (signingOut) return;
+        const idleMs = Date.now() - lastActivity();
+        if (idleMs >= IDLE_LIMIT_MS) {
+            signOutForInactivity();
+        } else if (idleMs >= IDLE_LIMIT_MS - WARNING_MS) {
+            showBanner(Math.ceil((IDLE_LIMIT_MS - idleMs) / 1000));
+        } else {
+            hideBanner();
+        }
+    }
+
+    async function start() {
+        const client = getClient();
+        if (!client) return;
+        const { data } = await client.auth.getSession();
+        if (!data || !data.session) return; // not logged in, nothing to protect
+
+        // the page being opened is itself a sign of life, unless the stored time is already far too old
+        // (a returning user after a long break must still be signed out)
+        const stored = storedActivity();
+        if (!stored || Date.now() - stored < IDLE_LIMIT_MS) markActivity();
+
+        let lastMove = 0;
+        ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'].forEach(name => {
+            window.addEventListener(name, () => {
+                const now = Date.now();
+                if (now - lastMove < 1000) return; // at most one write per second
+                lastMove = now;
+                markActivity();
+            }, { passive: true });
+        });
+
+        check();
+        setInterval(check, 1000);
+        document.addEventListener('visibilitychange', check);
+    }
+
+    document.addEventListener('DOMContentLoaded', start);
+})();
