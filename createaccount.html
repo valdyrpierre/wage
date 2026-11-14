@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Account | WageTracker</title>
-    <link rel="stylesheet" href="createaccount.css?v=3">
+    <link rel="stylesheet" href="createaccount.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -25,11 +25,29 @@
         </header>
 
         <form id="signup-form">
+            <div class="name-row">
+                <div>
+                    <label for="first-name">First name:</label>
+                    <input type="text" id="first-name" name="first-name" autocomplete="given-name" maxlength="40" required>
+                </div>
+                <div>
+                    <label for="last-name">Last name:</label>
+                    <input type="text" id="last-name" name="last-name" autocomplete="family-name" maxlength="40" required>
+                </div>
+            </div>
+
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+            <input type="email" id="email" name="email" autocomplete="email" required>
 
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
+            <input type="password" id="password" name="password" autocomplete="new-password" minlength="6" required>
+
+            <label for="confirm-password">Confirm password:</label>
+            <input type="password" id="confirm-password" name="confirm-password" autocomplete="new-password" required>
+
+            <label for="pay-start">Pay period start date <span class="optional">(optional)</span>:</label>
+            <input type="date" id="pay-start" name="pay-start">
+            <p class="field-hint">The first day of any one of your real pay periods. The Shifts page uses it to group your shifts. You can set it later on your Profile page.</p>
 
             <p id="error-msg" style="color: #dc2626; font-size: 0.85rem; margin-top: 10px;"></p>
             <p id="success-msg" style="color: #0f766e; font-size: 0.85rem; margin-top: 10px;"></p>
@@ -73,10 +91,19 @@
             errorMsg.textContent = '';
             successMsg.textContent = '';
 
+            const firstName = document.getElementById('first-name').value.trim();
+            const lastName = document.getElementById('last-name').value.trim();
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const payStart = document.getElementById('pay-start').value; // empty string when skipped
 
             // ---- validation before ever contacting Supabase ----
+
+            if (!firstName || !lastName) {
+                errorMsg.textContent = 'Please enter your first and last name.';
+                return;
+            }
 
             // simple email format check (not exhaustive, but catches obvious typos
             // like missing "@" or "." — the type="email" input already helps too)
@@ -94,9 +121,22 @@
                 return;
             }
 
+            if (password !== confirmPassword) {
+                errorMsg.textContent = 'The two passwords do not match.';
+                return;
+            }
+
+            // the name and pay period start are saved with the account itself (the same
+            // place the Profile page reads them), so nothing is asked again after login
             const { data, error } = await supabaseClient.auth.signUp({
                 email: email,
-                password: password
+                password: password,
+                options: {
+                    data: {
+                        full_name: firstName + ' ' + lastName,
+                        pay_period_start: payStart || null
+                    }
+                }
             });
 
             if (error) {
@@ -109,6 +149,11 @@
             // is turned OFF in Supabase (Authentication > Sign In / Providers > Email).
             // If confirmation is required, there is no active session yet,
             // and the user must confirm via email before being logged in.
+            if (!data.session) {
+                // email confirmation is on, so there is no login yet
+                successMsg.textContent = 'Account created! Check your email to confirm it, then log in.';
+                return;
+            }
             successMsg.textContent = 'Account created! Redirecting...';
             window.location.href = 'userinfo.html';
         });
