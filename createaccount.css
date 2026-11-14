@@ -48,14 +48,14 @@ form { display: flex; flex-direction: column; text-align: left; }
 
 label { font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; margin-top: 16px; text-transform: uppercase; letter-spacing: 0.04em; }
 
-input[type="text"], input[type="email"], input[type="password"] {
+input[type="text"], input[type="email"], input[type="password"], input[type="date"] {
     padding: 12px 14px;
     border: 1px solid var(--line); border-radius: 10px;
     background: var(--field); color: var(--text);
     font-size: 1rem; outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, input[type="date"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
 
 input[type="submit"] {
     margin-top: 22px; padding: 13px;
@@ -84,3 +84,11 @@ footer a { color: var(--accent); text-decoration: none; }
 
 @media (max-width: 420px) { main { padding: 28px 20px 22px; } }
 @media (prefers-reduced-motion: reduce) { main { animation: none; } }
+
+.name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.name-row input { width: 100%; box-sizing: border-box; }
+@media (max-width: 420px) { .name-row { grid-template-columns: 1fr; gap: 0; } }
+.optional { text-transform: none; font-weight: 400; letter-spacing: 0; }
+.field-hint { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
+input[type="date"] { color-scheme: light; }
+body.dark input[type="date"] { color-scheme: dark; }
