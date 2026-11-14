@@ -2,12 +2,10 @@
 const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-
-let currentUser = null; // the logged-in user's Supabase auth object (id, email, metadata, etc.)
-let userJobs = [];      // array of this user's rows from the "jobs" table
-
-
+// These hold data we fetch once and reuse across multiple functions,
+// so we don't have to re-query Supabase every time we need it.
+let currentUser = null; 
+let userJobs = [];     
 async function init() {
     // Check if someone is actually logged in. If not, bounce them to the login page —
     // this page should never be visible to a logged-out visitor.
@@ -21,9 +19,9 @@ async function init() {
     await loadProfileInfo();
     await loadJobsForEditing();
 }
-
-// PROFILE INFO DISPLAY (top section of the page)
 async function loadProfileInfo() {
+    // Supabase doesn't have a built-in "name" field on the user object,
+    // so we store/read it from user_metadata instead (a flexible JSON
     // field Supabase provides for exactly this kind of custom data).
     const name = currentUser.user_metadata?.full_name || '(not set)';
     document.getElementById('profile-name').textContent = name;
@@ -64,11 +62,18 @@ async function loadProfileInfo() {
     document.getElementById('hero-range').textContent = 'For ' + new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) + ' (wages + commission)';
 }
 
+// Calculates total income (wages + commission) for the current calendar month.
+// This is the same calculation used on the budget page, so the numbers agree
+// everywhere in the app.
 async function computeIncomeThisMonth() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
+    // We fetch starting from the Sunday that begins monthStart's week (not from
+    // monthStart itself). Why? Because if the 1st of the month falls in the
+    // middle of a week, we need that week's earlier shifts too, in order to
+    // correctly calculate whether later shifts in that same week hit overtime.
     const fetchFrom = getWeekStartDate(monthStart);
 
     const { data: shifts } = await supabaseClient
@@ -79,11 +84,16 @@ async function computeIncomeThisMonth() {
         .gte('clock_in', fetchFrom.toISOString())
         .lt('clock_in', monthEnd.toISOString());
 
-   
+    // Fetch any logged lunch breaks for these shifts (unpaid, so they're
+    // subtracted from each shift's hours), then run every shift through the
+    // overtime calculator so each shift's pay reflects whether it pushed the
+    // user over 40 hrs/week for its job.
     const breaksByShiftId = await fetchBreaksByShiftId((shifts || []).map(s => s.id));
     const shiftPayMap = computeShiftPayWithOvertime(shifts || [], breaksByShiftId);
 
-    
+    // Now sum up ONLY the shifts that actually fall within this calendar month
+    // (remember: we fetched a few extra "before the month started" shifts above,
+    // purely to get the overtime math right — we don't want to count their pay here).
     let wageTotal = 0;
     (shifts || []).forEach(s => {
         const clockIn = new Date(s.clock_in);
@@ -104,8 +114,6 @@ async function computeIncomeThisMonth() {
 
     return wageTotal + commissionTotal;
 }
-
-// UPDATE NAME / EMAIL / PASSWORD
 document.getElementById('update-form').addEventListener('submit', async (e) => {
     e.preventDefault(); // stop the browser's default "reload the page" form behavior
     const statusEl = document.getElementById('update-status');
@@ -115,7 +123,6 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
     const email = document.getElementById('update-email').value.trim();
     const password = document.getElementById('update-password').value;
     const payPeriodStart = document.getElementById('update-pay-period-start').value; // "YYYY-MM-DD" or empty
-    
     // a name with no space means there is no last name, and the dashboard needs both
     if (name && !name.includes(' ')) {
         statusEl.textContent = 'Please enter your first AND last name (example: Valdyr Pierre).';
@@ -137,9 +144,10 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
     }
 
     // password is optional here (blank = "don't change it"), but if the user
-    // did type something, it needs to meet Supabase's minimum length
-    if (password && password.length < 6) {
-        statusEl.textContent = 'New password must be at least 6 characters long.';
+    // did type something, it has to pass the same strength rules as sign up
+    const problems = password ? passwordProblems(password, email) : [];
+    if (problems.length) {
+        statusEl.textContent = 'New password is too weak. ' + problems[0] + '.';
         statusEl.style.color = '#dc2626';
         return;
     }
@@ -169,8 +177,6 @@ document.getElementById('update-form').addEventListener('submit', async (e) => {
     document.getElementById('update-password').value = ''; // clear the password field for security
     await loadProfileInfo(); // re-render the top section with the new info
 });
-
-// EDIT / DELETE JOBS
 // Populates the "Select a job" dropdown with the user's jobs, and wires it up
 // so picking a different job loads that job's info into the edit form below.
 async function loadJobsForEditing() {
@@ -291,7 +297,11 @@ document.getElementById('delete-job-btn').addEventListener('click', async () => 
     await loadJobsForEditing();
 });
 
+// ============================================================
 // LOGOUT
+// ============================================================
+// Both the nav bar's logout button and the one down in the Danger Zone
+// section do the exact same thing — just two convenient places to reach it.
 document.getElementById('logout-btn').addEventListener('click', async () => {
     await supabaseClient.auth.signOut(); // clears the local session/token
     window.location.href = 'login.html';
@@ -301,11 +311,10 @@ document.getElementById('nav-logout-btn').addEventListener('click', async () => 
     await supabaseClient.auth.signOut();
     window.location.href = 'login.html';
 });
-
-// DELETE ACCOUNT (wipes the user's data, then signs them out)
-// ============================================================
 // Note: this does NOT delete the actual login credentials (email/password)
-// from Supabase's auth system — that requires a privileged "service role".
+// from Supabase's auth system — that requires a privileged "service role"
+// API call that can't safely run in browser-side JavaScript. This button
+// removes everything the user actually see/use in the app, and logs them out.
 document.getElementById('delete-account-btn').addEventListener('click', async () => {
     // Two separate confirmations, since this is destructive and irreversible.
     const firstConfirm = confirm('This will permanently delete all your jobs, shifts, commissions, and bills. Continue?');
@@ -326,8 +335,6 @@ document.getElementById('delete-account-btn').addEventListener('click', async ()
     alert('Your data has been deleted and you have been logged out.');
     window.location.href = 'login.html';
 });
-
-
 // the jump bar sticks right under the top menu, so it needs to know how tall that menu is
 function setNavHeight() {
     const nav = document.querySelector('.main-nav');
@@ -391,7 +398,7 @@ function rollMoney(element, from, to) {
     function frame(now) {
         if (element.__ticket !== ticket) return;
 
-        const progress = Math.min((now - startTime) / 650, 1);
+        const progress = Math.max(0, Math.min((now - startTime) / 650, 1));
         const eased = 1 - Math.pow(1 - progress, 3); // fast at first, slow at the end
         const value = from + (to - from) * eased;
 
@@ -426,3 +433,18 @@ new MutationObserver(() => handleMoneyChange(heroAmount)).observe(heroAmount, { 
 
 // Kick everything off once the script loads.
 init();
+
+
+function passwordProblems(pw, email) {
+    const problems = [];
+    const lower = pw.toLowerCase();
+    const emailName = email.split('@')[0].toLowerCase();
+    const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(re => re.test(pw)).length;
+
+    if (pw.length < 10) problems.push('At least 10 characters');
+    if (kinds < 3) problems.push('Mix 3 of: lowercase, UPPERCASE, numbers, symbols');
+    if (['password', 'qwerty', '123456', 'abc123', 'letmein', 'welcome', 'admin'].some(w => lower.includes(w))) problems.push('No common words like "password" or "123456"');
+    if (/(.)\1{4,}/.test(pw)) problems.push('No long runs of the same character');
+    if (emailName.length >= 4 && lower.includes(emailName)) problems.push('Do not include your email name');
+    return problems;
+}
