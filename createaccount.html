@@ -77,7 +77,8 @@
         })();
     </script>
     <script>
-        
+        // TODO: replace with your actual Supabase project values
+        // Found in Supabase dashboard: Project Settings > API
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 
@@ -170,7 +171,15 @@
             });
 
             if (error) {
-                errorMsg.textContent = error.message;
+                // "User already registered" would tell an attacker that this email has an account,
+                // so that case gets a neutral message. password rule and rate limit errors are safe to show
+                if (error.status === 429) {
+                    errorMsg.textContent = 'Too many attempts. Please wait a few minutes and try again.';
+                } else if (error.code === 'weak_password') {
+                    errorMsg.textContent = 'Password is too weak. Use at least 10 characters with a mix of letters, numbers and symbols.';
+                } else {
+                    errorMsg.textContent = 'We could not create your account with those details. Please check them and try again, or log in if you already have an account.';
+                }
                 return;
             }
 
