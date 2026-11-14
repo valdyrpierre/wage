@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Account | WageTracker</title>
-    <link rel="stylesheet" href="createaccount.css?v=4">
+    <link rel="stylesheet" href="createaccount.css?v=5">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -40,7 +40,9 @@
             <input type="email" id="email" name="email" autocomplete="email" required>
 
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" autocomplete="new-password" minlength="6" required>
+            <input type="password" id="password" name="password" autocomplete="new-password" minlength="10" required>
+            <div id="pw-bar"><span></span><span></span><span></span><span></span></div>
+            <p id="pw-text" aria-live="polite"></p>
 
             <label for="confirm-password">Confirm password:</label>
             <input type="password" id="confirm-password" name="confirm-password" autocomplete="new-password" required>
@@ -75,12 +77,41 @@
         })();
     </script>
     <script>
-        // TODO: replace with your actual Supabase project values
-        // Found in Supabase dashboard: Project Settings > API
+        
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
 
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function passwordProblems(pw, email) {
+            const problems = [];
+            const lower = pw.toLowerCase();
+            const emailName = email.split('@')[0].toLowerCase();
+            const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(re => re.test(pw)).length;
+
+            if (pw.length < 10) problems.push('At least 10 characters');
+            if (kinds < 3) problems.push('Mix 3 of: lowercase, UPPERCASE, numbers, symbols');
+            if (['password', 'qwerty', '123456', 'abc123', 'letmein', 'welcome', 'admin'].some(w => lower.includes(w))) problems.push('No common words like "password" or "123456"');
+            if (/(.)\1{4,}/.test(pw)) problems.push('No long runs of the same character');
+            if (emailName.length >= 4 && lower.includes(emailName)) problems.push('Do not include your email name');
+            return problems;
+        }
+
+        // fills the strength bar under the password box as the user types
+        const passwordBox = document.getElementById('password');
+        const barParts = document.querySelectorAll('#pw-bar span');
+        const barText = document.getElementById('pw-text');
+        passwordBox.addEventListener('input', () => {
+            const pw = passwordBox.value;
+            const problems = passwordProblems(pw, document.getElementById('email').value);
+            // 0 = empty, 1 = weak, 2 = fair, 3 = good, 4 = strong (long and varied)
+            let level = pw ? 1 : 0;
+            if (pw && problems.length === 0) level = pw.length >= 16 ? 4 : pw.length >= 12 ? 3 : 2;
+            const colors = ['', '#ef4444', '#f59e0b', '#22c55e', '#10b981'];
+            barParts.forEach((part, i) => { part.style.background = i < level ? colors[level] : ''; });
+            barText.textContent = pw ? ['', 'Weak', 'Fair', 'Good', 'Strong'][level] + (problems.length ? ': ' + problems[0] : '') : '';
+            barText.style.color = colors[level];
+        });
 
         const form = document.getElementById('signup-form');
         const errorMsg = document.getElementById('error-msg');
@@ -113,11 +144,10 @@
                 return;
             }
 
-            // Supabase's default password policy requires at least 6 characters —
-            // checking here gives an instant, friendlier error instead of waiting
-            // on a round-trip to the server to find out
-            if (password.length < 6) {
-                errorMsg.textContent = 'Password must be at least 6 characters long.';
+            // the same rules the strength bar shows. Supabase enforces its own policy as well
+            const problems = passwordProblems(password, email);
+            if (problems.length) {
+                errorMsg.textContent = 'Password is too weak. ' + problems[0] + '.';
                 return;
             }
 
