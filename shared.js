@@ -1,10 +1,28 @@
 
+// Makes text safe to place inside an HTML template string. Anything a user can type
+// (company names, job titles) goes through this first, so "<img onerror=...>" shows up
+// as plain text instead of running as code.
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // Turns a plain number like 12.5 into a display string like "$12.50"
 function formatMoney(n) {
     // thousands commas ($4,975.93) so big money reads like a finance app
     return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ============================================================
+// OVERTIME + LUNCH BREAK CALCULATION
+// ============================================================
+// If you ever change the overtime rate, the weekly threshold, or how lunch
+// breaks factor into pay, this is now the ONLY place that needs updating —
+// every page that includes shared.js picks up the change automatically.
 
 const OVERTIME_WEEKLY_THRESHOLD = 40; // hours per week before overtime kicks in
 const OVERTIME_MULTIPLIER = 1.5;      // "time and a half" pay rate for overtime hours
@@ -32,11 +50,29 @@ function getWeekStartDate(date) {
 // Takes a list of completed shifts (each with clock_in, clock_out, job_id,
 // and the linked job's hourly_wage) and calculates how much each individual
 // shift actually paid, accounting for overtime AND unpaid lunch breaks.
+//
+// Why overtime needs this treatment: it isn't based on one shift's length —
+// it's based on TOTAL hours across a whole week, for a single company. If you
+// worked 35 hours earlier in the week and then work a 10-hour shift, only
+// the last 5 of those 10 hours count as overtime (35 + 5 = 40 regular, 5 OT).
+//
+// Why lunch breaks are subtracted: a logged lunch break is unpaid, so its
+// duration comes off the shift's raw clock-in-to-clock-out length before
+// any pay is calculated.
+//
+// breaksByShiftId: optional Map from shift.id -> array of break rows for
+// that shift (from fetchBreaksByShiftId below). Safe to omit if a page
+// doesn't care about breaks.
+//
+// Returns a Map where each key is a shift object and the value is that
+// shift's calculated pay (regular + overtime combined, breaks excluded).
 function computeShiftPayWithOvertime(shifts, breaksByShiftId) {
     breaksByShiftId = breaksByShiftId || new Map();
     const payByShift = new Map();
 
     // Step 1: group shifts by "company + week" — overtime is tracked separately
+    // per company, per week (two different companies don't share an overtime pool,
+    // and hours reset every new week).
     const groups = new Map();
     shifts.forEach(s => {
         const weekKey = getEmployerKey(s.jobs && s.jobs.company, s.job_id) + '_' + getWeekStartDate(new Date(s.clock_in)).getTime();
@@ -45,6 +81,7 @@ function computeShiftPayWithOvertime(shifts, breaksByShiftId) {
     });
 
     // Step 2: for each company+week group, walk through shifts in chronological
+    // order, keeping a running total of hours worked so far that week.
     // Whatever pushes the running total past 40 hours gets paid at the
     // overtime rate instead of the regular rate.
     groups.forEach(group => {
