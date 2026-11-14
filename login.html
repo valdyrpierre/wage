@@ -86,7 +86,12 @@
             });
 
             if (error) {
-                errorMsg.textContent = error.message;
+                // one message for every kind of login failure (wrong email, wrong password, unconfirmed account),
+                // so an attacker cannot tell which part of a guess was right. only a too-many-tries
+                // block gets its own message, because the user needs to know to wait
+                errorMsg.textContent = error.status === 429
+                    ? 'Too many attempts. Please wait a few minutes and try again.'
+                    : 'Please check your login info and try again.';
                 return;
             }
 
