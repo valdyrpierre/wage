@@ -1,4 +1,4 @@
-/* createaccount.css - Create Account page (same look as login) */
+
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -92,3 +92,7 @@ footer a { color: var(--accent); text-decoration: none; }
 .field-hint { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
 input[type="date"] { color-scheme: light; }
 body.dark input[type="date"] { color-scheme: dark; }
+
+#pw-bar { display: flex; gap: 4px; margin-top: 8px; }
+#pw-bar span { flex: 1; height: 5px; border-radius: 3px; background: rgba(148, 163, 184, 0.3); transition: background 0.2s; }
+#pw-text { font-size: 0.8rem; font-weight: 600; margin: 6px 0 0; min-height: 1em; }
