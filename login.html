@@ -66,6 +66,11 @@
         const form = document.getElementById('login-form');
         const errorMsg = document.getElementById('error-msg');
 
+        // sent here by the auto-logout, so say why
+        if (new URLSearchParams(window.location.search).get('timeout') === '1') {
+            errorMsg.textContent = 'You were signed out after 30 minutes of inactivity. Please log in again.';
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             errorMsg.textContent = '';
@@ -94,6 +99,8 @@
                     : 'Please check your login info and try again.';
                 return;
             }
+
+            try { localStorage.setItem('lastActivity', String(Date.now())); } catch (e) { }
 
             // login succeeded — redirect to the dashboard/tracker page
             window.location.href = 'dashboard.html';
