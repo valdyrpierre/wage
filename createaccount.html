@@ -188,6 +188,7 @@
             // is turned OFF in Supabase (Authentication > Sign In / Providers > Email).
             // If confirmation is required, there is no active session yet,
             // and the user must confirm via email before being logged in.
+            try { localStorage.setItem('lastActivity', String(Date.now())); } catch (e) { }
             if (!data.session) {
                 // email confirmation is on, so there is no login yet
                 successMsg.textContent = 'Account created! Check your email to confirm it, then log in.';
