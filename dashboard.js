@@ -1,5 +1,4 @@
-// If anything breaks, show a red message at the top of the page. before this, a broken script
-// just left the page stuck on "Loading..." or on $0.00 and nothing explained why
+
 function showPageError(message)
 {
     console.error('Dashboard error:', message);
@@ -27,7 +26,7 @@ function addListener(id, eventName, handler)
     element.addEventListener(eventName, handler);
 }
 
-// TODO: replace with your actual Supabase project values
+
         const SUPABASE_URL = 'https://wuuxogpncyixwxmlhdkz.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_4ProG0sjTH1-DCh9f5QsUg_L85xilyM';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -102,7 +101,6 @@ function addListener(id, eventName, handler)
             return `${d.getFullYear()}-${month}-${day}`;
         }
 
-        // Parses a "YYYY-MM-DD" string (like the value from a date input) as
         // LOCAL midnight instead of UTC midnight. Using `new Date("2026-08-20")`
         // directly parses it as UTC, which in US timezones actually lands on
         // the evening of Aug 19 local time — causing the "day" picker to
@@ -867,16 +865,6 @@ function addListener(id, eventName, handler)
                     void payDisplay.offsetWidth; // restart animation
                     payDisplay.classList.add('tick');
 
-                    // temporary check line, shows what the counter is working with
-                    let dbg = document.getElementById('live-debug');
-                    if (!dbg) {
-                        dbg = document.createElement('p');
-                        dbg.id = 'live-debug';
-                        dbg.style.cssText = 'font-size:12px;opacity:.7;margin:4px 0';
-                        document.getElementById('clock-status').after(dbg);
-                    }
-                    dbg.textContent = `check v29 | wage ${wage}/hr | worked ${elapsedMinutes.toFixed(1)} min | breaks ${(breakMs / 60000).toFixed(1)} min | pay ${wagePay.toFixed(2)} | today ${earnedBeforeWage.toFixed(2)}`;
-
                     if (lastTickError) {
                         document.getElementById('clock-status').textContent = 'Clocked in since ' + clockInTime.toLocaleTimeString();
                         lastTickError = '';
@@ -984,7 +972,7 @@ function addListener(id, eventName, handler)
         function renderCommissionViewMode(row, entry) {
             const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
-                <span class="commission-job">${jobTitle}</span>
+                <span class="commission-job">${escapeHtml(jobTitle)}</span>
                 <span class="commission-amount">${formatMoney(parseFloat(entry.amount))}</span>
                 <span class="commission-actions">
                     <button type="button" class="edit-commission-btn">Edit</button>
@@ -998,8 +986,8 @@ function addListener(id, eventName, handler)
         function renderCommissionEditMode(row, entry) {
             const jobTitle = entry.jobs ? jobLabel(entry.jobs) : '(job removed)';
             row.innerHTML = `
-                <span class="commission-job">${jobTitle}</span>
-                <input type="number" class="edit-commission-amount" name="amount" step="0.01" min="0.01" value="${entry.amount}">
+                <span class="commission-job">${escapeHtml(jobTitle)}</span>
+                <input type="number" class="edit-commission-amount" name="amount" step="0.01" min="0.01" value="${escapeHtml(entry.amount)}">
                 <span class="commission-actions">
                     <button type="button" class="save-commission-btn">Save</button>
                     <button type="button" class="cancel-commission-btn">Cancel</button>
@@ -1536,10 +1524,6 @@ function addListener(id, eventName, handler)
             window.location.href = 'login.html';
         });
 
-        // ============================================================
-        // WORK + COMMISSION TRACKER
-        // (added to match valdyrpierre.github.io/budget/homepage.html)
-        // ============================================================
         // Design notes:
         // - phones_repaired / insurance_signups / total_customers /
         //   five_star_reviews are stored in the "daily_metrics" table. there is
@@ -2590,17 +2574,6 @@ function addListener(id, eventName, handler)
                 document.getElementById('job-title-display').textContent = 'Error loading dashboard: ' + err.message;
             }
         })();
-
-
-// ============================================================
-// FINANCE LAYER (top card, count-up numbers, dark / light theme, quick buttons)
-// was dashboard-finance.js. it only watches numbers this file already puts on the page.
-// it sits OUTSIDE the main function above on purpose, and must stay at the bottom
-// ============================================================
-
-// dashboard-finance.js - the "finance app" layer of the dashboard.
-// It never touches the database. It only watches the numbers dashboard.js already puts on the page,
-// then adds the top card, the count-up numbers, the dark / light theme and the quick buttons.
 
 // ---------- HELPERS ----------
 
